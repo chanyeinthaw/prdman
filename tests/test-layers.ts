@@ -8,6 +8,7 @@ import {
 } from "../src/domain/errors.js";
 import {
   FeatureId,
+  ImportFile,
   PrdId,
   PrdItem,
   PrdItemInput,
@@ -179,6 +180,33 @@ export class TestPrdRepo {
         return [...this.store.keys()]
           .filter((key) => (this.store.get(key)?.size ?? 0) > 0)
           .sort();
+      }),
+
+    importFile: (data: ImportFile) =>
+      Effect.gen(this, function* () {
+        const featureMap = this.getFeatureMap(data.id);
+        let created = 0;
+        let skipped = 0;
+
+        for (const input of data.items) {
+          if (featureMap.has(input.id)) {
+            skipped++;
+            continue;
+          }
+
+          const now = new Date();
+          const item = PrdItem.make({
+            ...input,
+            createdAt: now,
+            updatedAt: now,
+            locked: false,
+          });
+
+          featureMap.set(input.id, item);
+          created++;
+        }
+
+        return { created, skipped };
       }),
   });
 

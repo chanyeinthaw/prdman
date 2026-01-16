@@ -56,6 +56,14 @@ export class PrdItemPartialInput extends Schema.Class<PrdItemPartialInput>(
 
 export const PrdItemPartialInputJson = Schema.parseJson(PrdItemPartialInput)
 
+// Import file schema: { id: "feature-id", items: [...PrdItemInput] }
+export class ImportFile extends Schema.Class<ImportFile>("ImportFile")({
+  id: FeatureId,
+  items: Schema.Array(PrdItemInput),
+}) {}
+
+export const ImportFileJson = Schema.parseJson(ImportFile)
+
 export const PRD_INPUT_HELP = `
 Expected PRD structure:
 {

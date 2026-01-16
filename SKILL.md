@@ -34,6 +34,9 @@ prdman delete <feature-id> <prd-id>
 # lock/unlock (requires password from ~/.config/prdman/password)
 prdman lock <feature-id> <prd-id> --password "<password>"
 prdman unlock <feature-id> <prd-id> --password "<password>"
+
+# import PRDs from a JSON file
+prdman import <file-path>
 ```
 
 ## PRD JSON Structure
@@ -95,3 +98,29 @@ prdman list
 ```bash
 prdman details payments PAY-0001
 ```
+
+### Import PRDs from file
+
+```bash
+prdman import ./prds.json
+```
+
+## Import File Structure
+
+```json
+{
+  "id": "feature-id",
+  "items": [
+    {
+      "id": "AUTH-0001",
+      "priority": 1,
+      "name": "User Login",
+      "description": "Implement login",
+      "steps": ["Step 1"],
+      "status": "todo"
+    }
+  ]
+}
+```
+
+Duplicate IDs are skipped during import.

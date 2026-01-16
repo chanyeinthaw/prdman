@@ -7,6 +7,7 @@ import {
 } from "../domain/errors.js"
 import {
   FeatureId,
+  ImportFile,
   PrdId,
   PrdItem,
   PrdItemInput,
@@ -255,6 +256,41 @@ export const PrdRepoJsonLayer = Layer.effect(
         .map((key) => FeatureId.make(key))
     })
 
+    const importFile = Effect.fn("PrdRepo.importFile")(function* (
+      importData: ImportFile
+    ) {
+      const data = yield* load
+      const items = [...getFeatureItems(data, importData.id)]
+      const existingIds = new Set(items.map((item) => item.id))
+
+      let created = 0
+      let skipped = 0
+
+      for (const input of importData.items) {
+        if (existingIds.has(input.id)) {
+          skipped++
+          continue
+        }
+
+        const now = new Date()
+        const newItem = PrdItem.make({
+          ...input,
+          createdAt: now,
+          updatedAt: now,
+          locked: false,
+        })
+
+        items.push(newItem)
+        existingIds.add(input.id)
+        created++
+      }
+
+      const newData: DataStore = { ...data, [importData.id]: items }
+      yield* save(newData)
+
+      return { created, skipped }
+    })
+
     return PrdRepo.of({
       create,
       update,
@@ -265,6 +301,7 @@ export const PrdRepoJsonLayer = Layer.effect(
       lock,
       unlock,
       listFeatures,
+      importFile,
     })
   })
 )

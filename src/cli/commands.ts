@@ -1,7 +1,9 @@
 import { Args, Command, Options } from "@effect/cli";
+import { FileSystem } from "@effect/platform";
 import { Console, Effect, Option, Schema } from "effect";
 import {
   FeatureId,
+  ImportFileJson,
   PrdId,
   PrdItem,
   PrdItemInputJson,
@@ -44,6 +46,10 @@ const statusArg = Args.choice(statusChoices, { name: "status" });
 const passwordOption = Options.text("password").pipe(
   Options.withAlias("p"),
   Options.withDescription("Password for lock/unlock operations"),
+);
+
+const filePathArg = Args.text({ name: "file-path" }).pipe(
+  Args.withDescription("Path to JSON file to import"),
 );
 
 const formatPrdItem = (item: PrdItem): string => {
@@ -259,6 +265,57 @@ const unlockCommand = Command.make(
   ),
 ).pipe(Command.withDescription("Unlock a PRD item (requires password)"));
 
+const IMPORT_FILE_HELP = `
+Expected import file structure:
+{
+  "id": "feature-id",        // required, feature ID to import items into
+  "items": [                 // required, array of PRD items
+    {
+      "id": "XXX-YYYY",
+      "priority": 1,
+      "name": "Feature name",
+      "description": "Details...",
+      "steps": ["Step 1", "Step 2"],
+      "acceptanceCriteria": ["..."],  // optional
+      "status": "todo",
+      "note": "..."                   // optional
+    }
+  ]
+}
+`.trim();
+
+const importCommand = Command.make(
+  "import",
+  { filePath: filePathArg },
+  Effect.fn(
+    function* ({ filePath }) {
+      const repo = yield* PrdRepo;
+      const fs = yield* FileSystem.FileSystem;
+
+      const content = yield* fs.readFileString(filePath).pipe(
+        Effect.mapError(() => new InvalidPrdInputError({ reason: `Failed to read file: ${filePath}` })),
+      );
+
+      const importData = yield* Schema.decodeUnknown(ImportFileJson)(content).pipe(
+        Effect.mapError(
+          (e) =>
+            new InvalidPrdInputError({
+              reason: e.message,
+            }),
+        ),
+      );
+
+      const { created, skipped } = yield* repo.importFile(importData);
+      yield* Console.log(`Imported PRDs for feature: ${importData.id}`);
+      yield* Console.log(`  Created: ${created}`);
+      yield* Console.log(`  Skipped (duplicate IDs): ${skipped}`);
+    },
+    Effect.catchTag("InvalidPrdInputError", (e) =>
+      Console.error(`${e.message}\n\n${IMPORT_FILE_HELP}`),
+    ),
+  ),
+).pipe(Command.withDescription("Import PRD items from a JSON file"));
+
 export const rootCommand = Command.make("prdman", {}).pipe(
   Command.withDescription("PRD Management CLI"),
   Command.withSubcommands([
@@ -270,5 +327,6 @@ export const rootCommand = Command.make("prdman", {}).pipe(
     detailsCommand,
     lockCommand,
     unlockCommand,
+    importCommand,
   ]),
 );

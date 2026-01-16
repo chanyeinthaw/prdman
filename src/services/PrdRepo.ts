@@ -6,6 +6,7 @@ import type {
 } from "../domain/errors.js"
 import type {
   FeatureId,
+  ImportFile,
   PrdId,
   PrdItem,
   PrdItemInput,
@@ -56,5 +57,12 @@ export class PrdRepo extends Context.Tag("@prdman/PrdRepo")<
     ) => Effect.Effect<void, PrdNotFoundError>
 
     readonly listFeatures: () => Effect.Effect<readonly FeatureId[]>
+
+    readonly importFile: (
+      data: ImportFile
+    ) => Effect.Effect<
+      { created: number; skipped: number },
+      DuplicateIdError
+    >
   }
 >() {}

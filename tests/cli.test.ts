@@ -1,4 +1,5 @@
 import { Command } from "@effect/cli";
+import { FileSystem } from "@effect/platform";
 import { Console, Effect, Layer } from "effect";
 import { describe, expect, it } from "@effect/vitest";
 import { rootCommand } from "../src/cli/commands.js";
@@ -12,6 +13,31 @@ const cli = Command.run(rootCommand, {
   version: "1.0.0",
 });
 
+// In-memory file system for testing
+const createMockFileSystem = () => {
+  const files = new Map<string, string>();
+
+  return {
+    files,
+    layer: Layer.succeed(FileSystem.FileSystem, {
+      readFileString: (path: string) =>
+        Effect.gen(function* () {
+          const content = files.get(path);
+          if (content === undefined) {
+            return yield* Effect.fail(new Error(`File not found: ${path}`));
+          }
+          return content;
+        }),
+      writeFileString: (path: string, content: string) =>
+        Effect.sync(() => {
+          files.set(path, content);
+        }),
+      exists: (path: string) => Effect.sync(() => files.has(path)),
+      makeDirectory: () => Effect.void,
+    } as unknown as FileSystem.FileSystem),
+  };
+};
+
 // Create test context with mock console and services
 const createTestContext = (password: string | null = "test-password") => {
   const {
@@ -19,13 +45,14 @@ const createTestContext = (password: string | null = "test-password") => {
     passwordService,
     layer: servicesLayer,
   } = createTestLayer(password);
+  const mockFs = createMockFileSystem();
 
   const testLayer = Effect.gen(function* () {
     const console = yield* MockConsole.make;
-    return Layer.mergeAll(Console.setConsole(console), servicesLayer);
+    return Layer.mergeAll(Console.setConsole(console), servicesLayer, mockFs.layer);
   }).pipe(Layer.unwrapEffect);
 
-  return { repo, passwordService, testLayer };
+  return { repo, passwordService, testLayer, mockFs };
 };
 
 // Helper to run CLI command
@@ -637,6 +664,153 @@ describe("CLI Commands", () => {
           repo.layer,
         );
         expect(item.locked).toBe(false);
+      }),
+    );
+  });
+
+  describe("import", () => {
+    it.effect(
+      "imports PRD items from a JSON file",
+      Effect.fn(function* () {
+        const { repo, testLayer, mockFs } = createTestContext();
+
+        const importData = {
+          id: "AUTH",
+          items: [
+            {
+              id: "AUTH-0001",
+              priority: 1,
+              name: "User Login",
+              description: "Implement login",
+              steps: ["Step 1"],
+              status: "todo",
+            },
+            {
+              id: "AUTH-0002",
+              priority: 2,
+              name: "User Logout",
+              description: "Implement logout",
+              steps: ["Step 1"],
+              status: "todo",
+            },
+          ],
+        };
+
+        mockFs.files.set("/tmp/import.json", JSON.stringify(importData));
+
+        yield* runCli(["import", "/tmp/import.json"], testLayer);
+
+        const lines = yield* MockConsole.getLines({ stripAnsi: true });
+        const output = lines.join("\n");
+        expect(output).toContain("Imported PRDs for feature: AUTH");
+        expect(output).toContain("Created: 2");
+        expect(output).toContain("Skipped (duplicate IDs): 0");
+
+        // Verify items were created
+        const items = yield* Effect.provide(
+          PrdRepo.pipe(Effect.flatMap((r) => r.list(FeatureId.make("AUTH")))),
+          repo.layer,
+        );
+        expect(items.length).toBe(2);
+        expect(items[0]?.id).toBe("AUTH-0001");
+        expect(items[1]?.id).toBe("AUTH-0002");
+      }),
+    );
+
+    it.effect(
+      "skips duplicate IDs during import",
+      Effect.fn(function* () {
+        const { repo, testLayer, mockFs } = createTestContext();
+
+        // Create existing item
+        yield* Effect.provide(
+          Effect.gen(function* () {
+            const r = yield* PrdRepo;
+            yield* r.create(FeatureId.make("AUTH"), {
+              id: PrdId.make("AUTH-0001"),
+              priority: 1,
+              name: "Existing",
+              description: "Desc",
+              steps: [],
+              acceptanceCriteria: [],
+              status: "todo",
+            });
+          }),
+          repo.layer,
+        );
+
+        const importData = {
+          id: "AUTH",
+          items: [
+            {
+              id: "AUTH-0001",
+              priority: 1,
+              name: "Duplicate",
+              description: "Should be skipped",
+              steps: [],
+              status: "todo",
+            },
+            {
+              id: "AUTH-0002",
+              priority: 2,
+              name: "New Item",
+              description: "Should be created",
+              steps: [],
+              status: "todo",
+            },
+          ],
+        };
+
+        mockFs.files.set("/tmp/import.json", JSON.stringify(importData));
+
+        yield* runCli(["import", "/tmp/import.json"], testLayer);
+
+        const lines = yield* MockConsole.getLines({ stripAnsi: true });
+        const output = lines.join("\n");
+        expect(output).toContain("Created: 1");
+        expect(output).toContain("Skipped (duplicate IDs): 1");
+
+        // Verify original item unchanged
+        const item = yield* Effect.provide(
+          PrdRepo.pipe(
+            Effect.flatMap((r) =>
+              r.get(FeatureId.make("AUTH"), PrdId.make("AUTH-0001")),
+            ),
+          ),
+          repo.layer,
+        );
+        expect(item.name).toBe("Existing");
+      }),
+    );
+
+    it.effect(
+      "shows error for invalid JSON file",
+      Effect.fn(function* () {
+        const { testLayer, mockFs } = createTestContext();
+
+        mockFs.files.set("/tmp/invalid.json", '{"invalid": "json"}');
+
+        yield* runCli(["import", "/tmp/invalid.json"], testLayer);
+
+        const errorLines = yield* MockConsole.getErrorLines({
+          stripAnsi: true,
+        });
+        expect(errorLines.join("\n")).toContain("Invalid PRD input");
+        expect(errorLines.join("\n")).toContain("Expected import file structure");
+      }),
+    );
+
+    it.effect(
+      "shows error for non-existent file",
+      Effect.fn(function* () {
+        const { testLayer } = createTestContext();
+
+        yield* runCli(["import", "/tmp/nonexistent.json"], testLayer);
+
+        const errorLines = yield* MockConsole.getErrorLines({
+          stripAnsi: true,
+        });
+        expect(errorLines.join("\n")).toContain("Failed to read file");
       }),
     );
   });
