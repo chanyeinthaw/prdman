@@ -16,6 +16,9 @@ prdman create <feature-id> '<json>'
 # list PRDs for a feature (sorted by priority)
 prdman list <feature-id>
 
+# show details of a PRD item
+prdman details <feature-id> <prd-id>
+
 # update a PRD (blocked if locked)
 prdman update <feature-id> <prd-id> '<partial-json>'
 
@@ -76,4 +79,10 @@ prdman update-status payments PAY-0001 done
 
 ```bash
 prdman list payments
+```
+
+### View PRD details
+
+```bash
+prdman details payments PAY-0001
 ```

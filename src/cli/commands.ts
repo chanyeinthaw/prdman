@@ -184,6 +184,19 @@ const listCommand = Command.make(
   }),
 ).pipe(Command.withDescription("List PRD items sorted by priority"));
 
+const detailsCommand = Command.make(
+  "details",
+  { featureId: featureIdArg, prdId: prdIdArg },
+  Effect.fn(
+    function* ({ featureId, prdId }) {
+      const repo = yield* PrdRepo;
+      const item = yield* repo.get(featureId, prdId);
+      yield* Console.log(formatPrdItemDetail(item));
+    },
+    Effect.catchTag("PrdNotFoundError", (e) => Console.error(e.message)),
+  ),
+).pipe(Command.withDescription("Show details of a PRD item"));
+
 const lockCommand = Command.make(
   "lock",
   { featureId: featureIdArg, prdId: prdIdArg, password: passwordOption },
@@ -232,6 +245,7 @@ export const rootCommand = Command.make("prdman", {}).pipe(
     updateStatusCommand,
     deleteCommand,
     listCommand,
+    detailsCommand,
     lockCommand,
     unlockCommand,
   ]),

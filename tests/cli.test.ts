@@ -168,6 +168,61 @@ describe("CLI Commands", () => {
     );
   });
 
+  describe("details", () => {
+    it.effect(
+      "shows PRD item details",
+      Effect.fn(function* () {
+        const { repo, testLayer } = createTestContext();
+
+        yield* Effect.provide(
+          Effect.gen(function* () {
+            const r = yield* PrdRepo;
+            yield* r.create(FeatureId.make("AUTH"), {
+              id: PrdId.make("AUTH-0001"),
+              priority: 1,
+              name: "User Login",
+              description: "Implement login flow",
+              steps: ["Create form", "Add validation"],
+              acceptanceCriteria: ["User can login"],
+              status: "todo",
+              note: "Important feature",
+            });
+          }),
+          repo.layer,
+        );
+
+        yield* runCli(["details", "AUTH", "AUTH-0001"], testLayer);
+
+        const lines = yield* MockConsole.getLines({ stripAnsi: true });
+        const output = lines.join("\n");
+
+        expect(output).toContain("ID: AUTH-0001");
+        expect(output).toContain("Priority: 1");
+        expect(output).toContain("Name: User Login");
+        expect(output).toContain("Description: Implement login flow");
+        expect(output).toContain("1. Create form");
+        expect(output).toContain("2. Add validation");
+        expect(output).toContain("Acceptance Criteria:");
+        expect(output).toContain("1. User can login");
+        expect(output).toContain("Note: Important feature");
+      }),
+    );
+
+    it.effect(
+      "shows error for non-existent PRD",
+      Effect.fn(function* () {
+        const { testLayer } = createTestContext();
+
+        yield* runCli(["details", "AUTH", "AUTH-9999"], testLayer);
+
+        const errorLines = yield* MockConsole.getErrorLines({
+          stripAnsi: true,
+        });
+        expect(errorLines.join("\n")).toContain("not found");
+      }),
+    );
+  });
+
   describe("update", () => {
     it.effect(
       "updates PRD fields",
