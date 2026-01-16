@@ -54,5 +54,7 @@ export class PrdRepo extends Context.Tag("@prdman/PrdRepo")<
       featureId: FeatureId,
       id: PrdId
     ) => Effect.Effect<void, PrdNotFoundError>
+
+    readonly listFeatures: () => Effect.Effect<readonly FeatureId[]>
   }
 >() {}

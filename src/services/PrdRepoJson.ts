@@ -247,6 +247,14 @@ export const PrdRepoJsonLayer = Layer.effect(
       yield* save(newData)
     })
 
+    const listFeatures = Effect.fn("PrdRepo.listFeatures")(function* () {
+      const data = yield* load
+      return Object.keys(data)
+        .filter((key) => (data[key]?.length ?? 0) > 0)
+        .sort()
+        .map((key) => FeatureId.make(key))
+    })
+
     return PrdRepo.of({
       create,
       update,
@@ -256,6 +264,7 @@ export const PrdRepoJsonLayer = Layer.effect(
       get,
       lock,
       unlock,
+      listFeatures,
     })
   })
 )

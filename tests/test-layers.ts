@@ -173,6 +173,13 @@ export class TestPrdRepo {
 
         featureMap.set(id, updated);
       }),
+
+    listFeatures: () =>
+      Effect.sync(() => {
+        return [...this.store.keys()]
+          .filter((key) => (this.store.get(key)?.size ?? 0) > 0)
+          .sort();
+      }),
   });
 
   clear() {

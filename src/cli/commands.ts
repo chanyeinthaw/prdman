@@ -1,5 +1,5 @@
 import { Args, Command, Options } from "@effect/cli";
-import { Console, Effect, Schema } from "effect";
+import { Console, Effect, Option, Schema } from "effect";
 import {
   FeatureId,
   PrdId,
@@ -16,6 +16,12 @@ import { PrdRepo } from "../services/PrdRepo.js";
 const featureIdArg = Args.text({ name: "feature-id" }).pipe(
   Args.withDescription("Feature ID to scope PRD items"),
   Args.withSchema(FeatureId),
+);
+
+const optionalFeatureIdArg = Args.text({ name: "feature-id" }).pipe(
+  Args.withDescription("Feature ID to scope PRD items (optional - lists features if omitted)"),
+  Args.withSchema(FeatureId),
+  Args.optional,
 );
 
 const prdIdArg = Args.text({ name: "prd-id" }).pipe(
@@ -167,22 +173,38 @@ const deleteCommand = Command.make(
 
 const listCommand = Command.make(
   "list",
-  { featureId: featureIdArg },
+  { featureId: optionalFeatureIdArg },
   Effect.fn(function* ({ featureId }) {
     const repo = yield* PrdRepo;
-    const items = yield* repo.list(featureId);
 
-    if (items.length === 0) {
-      yield* Console.log(`No PRD items found for feature: ${featureId}`);
+    if (Option.isNone(featureId)) {
+      const features = yield* repo.listFeatures();
+
+      if (features.length === 0) {
+        yield* Console.log("No features found");
+        return;
+      }
+
+      yield* Console.log("Features:\n");
+      for (const feature of features) {
+        yield* Console.log(`  ${feature}`);
+      }
       return;
     }
 
-    yield* Console.log(`PRD items for feature: ${featureId}\n`);
+    const items = yield* repo.list(featureId.value);
+
+    if (items.length === 0) {
+      yield* Console.log(`No PRD items found for feature: ${featureId.value}`);
+      return;
+    }
+
+    yield* Console.log(`PRD items for feature: ${featureId.value}\n`);
     for (const item of items) {
       yield* Console.log(formatPrdItem(item));
     }
   }),
-).pipe(Command.withDescription("List PRD items sorted by priority"));
+).pipe(Command.withDescription("List PRD items sorted by priority (or list features if no feature-id)"));
 
 const detailsCommand = Command.make(
   "details",

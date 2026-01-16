@@ -13,6 +13,9 @@ Manage Product Requirement Documents scoped by feature.
 # create a PRD
 prdman create <feature-id> '<json>'
 
+# list all features
+prdman list
+
 # list PRDs for a feature (sorted by priority)
 prdman list <feature-id>
 
@@ -79,6 +82,12 @@ prdman update-status payments PAY-0001 done
 
 ```bash
 prdman list payments
+```
+
+### View all features
+
+```bash
+prdman list
 ```
 
 ### View PRD details

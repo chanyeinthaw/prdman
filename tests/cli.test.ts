@@ -166,6 +166,98 @@ describe("CLI Commands", () => {
         expect(lines.join("\n")).toContain("[LOCKED]");
       }),
     );
+
+    it.effect(
+      "lists all features when no feature-id provided",
+      Effect.fn(function* () {
+        const { repo, testLayer } = createTestContext();
+
+        yield* Effect.provide(
+          Effect.gen(function* () {
+            const r = yield* PrdRepo;
+            yield* r.create(FeatureId.make("AUTH"), {
+              id: PrdId.make("AUTH-0001"),
+              priority: 1,
+              name: "Auth Feature",
+              description: "Desc",
+              steps: [],
+              acceptanceCriteria: [],
+              status: "todo",
+            });
+            yield* r.create(FeatureId.make("PAYMENTS"), {
+              id: PrdId.make("PAY-0001"),
+              priority: 1,
+              name: "Payments Feature",
+              description: "Desc",
+              steps: [],
+              acceptanceCriteria: [],
+              status: "todo",
+            });
+          }),
+          repo.layer,
+        );
+
+        yield* runCli(["list"], testLayer);
+
+        const lines = yield* MockConsole.getLines({ stripAnsi: true });
+        const output = lines.join("\n");
+        expect(output).toContain("Features:");
+        expect(output).toContain("AUTH");
+        expect(output).toContain("PAYMENTS");
+      }),
+    );
+
+    it.effect(
+      "shows empty message when no features exist",
+      Effect.fn(function* () {
+        const { testLayer } = createTestContext();
+
+        yield* runCli(["list"], testLayer);
+
+        const lines = yield* MockConsole.getLines({ stripAnsi: true });
+        expect(lines.join("\n")).toContain("No features found");
+      }),
+    );
+
+    it.effect(
+      "lists features in sorted order",
+      Effect.fn(function* () {
+        const { repo, testLayer } = createTestContext();
+
+        yield* Effect.provide(
+          Effect.gen(function* () {
+            const r = yield* PrdRepo;
+            yield* r.create(FeatureId.make("ZEBRA"), {
+              id: PrdId.make("ZEB-0001"),
+              priority: 1,
+              name: "Zebra Feature",
+              description: "Desc",
+              steps: [],
+              acceptanceCriteria: [],
+              status: "todo",
+            });
+            yield* r.create(FeatureId.make("ALPHA"), {
+              id: PrdId.make("ALP-0001"),
+              priority: 1,
+              name: "Alpha Feature",
+              description: "Desc",
+              steps: [],
+              acceptanceCriteria: [],
+              status: "todo",
+            });
+          }),
+          repo.layer,
+        );
+
+        yield* runCli(["list"], testLayer);
+
+        const lines = yield* MockConsole.getLines({ stripAnsi: true });
+        const output = lines.join("\n");
+        const alphaIdx = output.indexOf("ALPHA");
+        const zebraIdx = output.indexOf("ZEBRA");
+        expect(alphaIdx).toBeLessThan(zebraIdx);
+      }),
+    );
   });
 
   describe("details", () => {
