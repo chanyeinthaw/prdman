@@ -2,6 +2,7 @@ import { FileSystem } from "@effect/platform"
 import { Effect, Layer, Schema } from "effect"
 import {
   DuplicateIdError,
+  FeatureHasLockedPrdsError,
   PrdLockedError,
   PrdNotFoundError,
 } from "../domain/errors.js"
@@ -291,6 +292,43 @@ export const PrdRepoJsonLayer = Layer.effect(
       return { created, skipped }
     })
 
+    const deleteFeature = Effect.fn("PrdRepo.deleteFeature")(function* (
+      featureId: FeatureId
+    ) {
+      const data = yield* load
+      const items = getFeatureItems(data, featureId)
+
+      if (items.length === 0) {
+        return { deleted: 0 }
+      }
+
+      const lockedIds = items.filter((item) => item.locked).map((item) => item.id)
+      if (lockedIds.length > 0) {
+        return yield* new FeatureHasLockedPrdsError({ featureId, lockedIds })
+      }
+
+      const deleted = items.length
+      const { [featureId]: _, ...newData } = data
+      yield* save(newData)
+      return { deleted }
+    })
+
+    const deleteFeatureForce = Effect.fn("PrdRepo.deleteFeatureForce")(
+      function* (featureId: FeatureId) {
+        const data = yield* load
+        const items = getFeatureItems(data, featureId)
+        const deleted = items.length
+
+        if (deleted === 0) {
+          return { deleted: 0 }
+        }
+
+        const { [featureId]: _, ...newData } = data
+        yield* save(newData)
+        return { deleted }
+      }
+    )
+
     return PrdRepo.of({
       create,
       update,
@@ -302,6 +340,8 @@ export const PrdRepoJsonLayer = Layer.effect(
       unlock,
       listFeatures,
       importFile,
+      deleteFeature,
+      deleteFeatureForce,
     })
   })
 )

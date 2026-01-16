@@ -63,3 +63,15 @@ export class InvalidPrdInputError extends Schema.TaggedError<InvalidPrdInputErro
     return `Invalid PRD input: ${this.reason}`
   }
 }
+
+export class FeatureHasLockedPrdsError extends Schema.TaggedError<FeatureHasLockedPrdsError>()(
+  "FeatureHasLockedPrdsError",
+  {
+    featureId: Schema.String,
+    lockedIds: Schema.Array(Schema.String),
+  }
+) {
+  override get message() {
+    return `Cannot delete feature '${this.featureId}': ${this.lockedIds.length} PRD(s) are locked: [${this.lockedIds.join(", ")}]. Use --password to force.`
+  }
+}

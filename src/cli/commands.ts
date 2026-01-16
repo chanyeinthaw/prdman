@@ -1,4 +1,4 @@
-import { Args, Command, Options } from "@effect/cli";
+import { Args, Command, Options, Prompt } from "@effect/cli";
 import { FileSystem } from "@effect/platform";
 import { Console, Effect, Option, Schema } from "effect";
 import {
@@ -31,6 +31,12 @@ const prdIdArg = Args.text({ name: "prd-id" }).pipe(
   Args.withSchema(PrdId),
 );
 
+const optionalPrdIdArg = Args.text({ name: "prd-id" }).pipe(
+  Args.withDescription("PRD item ID (format: XXX-YYYY) - if omitted, deletes entire feature"),
+  Args.withSchema(PrdId),
+  Args.optional,
+);
+
 const jsonArg = Args.text({ name: "json" }).pipe(
   Args.withDescription("PRD item as JSON string"),
 );
@@ -46,6 +52,18 @@ const statusArg = Args.choice(statusChoices, { name: "status" });
 const passwordOption = Options.text("password").pipe(
   Options.withAlias("p"),
   Options.withDescription("Password for lock/unlock operations"),
+);
+
+const optionalPasswordOption = Options.text("password").pipe(
+  Options.withAlias("p"),
+  Options.withDescription("Password to force deletion of locked PRDs"),
+  Options.optional,
+);
+
+const yesOption = Options.boolean("yes").pipe(
+  Options.withAlias("y"),
+  Options.withDescription("Skip confirmation prompt"),
+  Options.withDefault(false),
 );
 
 const filePathArg = Args.text({ name: "file-path" }).pipe(
@@ -163,19 +181,85 @@ const updateStatusCommand = Command.make(
   ),
 ).pipe(Command.withDescription("Update PRD status (ignores lock)"));
 
+const formatPrdForDeletion = (item: PrdItem): string => {
+  const lockIndicator = item.locked ? " [LOCKED]" : "";
+  return `- ${item.id}: ${item.name}${lockIndicator}`;
+};
+
 const deleteCommand = Command.make(
   "delete",
-  { featureId: featureIdArg, prdId: prdIdArg },
+  { featureId: featureIdArg, prdId: optionalPrdIdArg, password: optionalPasswordOption, yes: yesOption },
   Effect.fn(
-    function* ({ featureId, prdId }) {
+    function* ({ featureId, prdId, password, yes }) {
       const repo = yield* PrdRepo;
-      yield* repo.delete(featureId, prdId);
-      yield* Console.log(`Deleted PRD item: ${prdId}`);
+
+      // Single PRD deletion (existing behavior)
+      if (Option.isSome(prdId)) {
+        yield* repo.delete(featureId, prdId.value);
+        yield* Console.log(`Deleted PRD item: ${prdId.value}`);
+        return;
+      }
+
+      // Feature deletion flow
+      const items = yield* repo.list(featureId);
+
+      if (items.length === 0) {
+        yield* Console.log(`No PRDs found for feature '${featureId}'`);
+        return;
+      }
+
+      // Check for locked PRDs
+      const lockedItems = items.filter((item) => item.locked);
+      const hasLockedPrds = lockedItems.length > 0;
+
+      // Display PRDs that will be deleted
+      yield* Console.log(`The following ${items.length} PRD(s) will be deleted:\n`);
+      for (const item of items) {
+        yield* Console.log(formatPrdForDeletion(item));
+      }
+      yield* Console.log("");
+
+      // Require password for locked PRDs
+      if (hasLockedPrds && Option.isNone(password)) {
+        yield* Console.error(
+          `Cannot delete feature '${featureId}': ${lockedItems.length} PRD(s) are locked: [${lockedItems.map((i) => i.id).join(", ")}]. Use --password to force.`
+        );
+        return;
+      }
+
+      // Verify password if provided and there are locked PRDs
+      if (hasLockedPrds && Option.isSome(password)) {
+        const passwordService = yield* PasswordService;
+        yield* passwordService.verify(password.value);
+      }
+
+      // Confirmation prompt (unless --yes flag is set)
+      if (!yes) {
+        const confirmed = yield* Prompt.confirm({
+          message: `Are you sure you want to delete all ${items.length} PRD(s) from feature '${featureId}'?`,
+          initial: false,
+        });
+
+        if (!confirmed) {
+          yield* Console.log("Deletion cancelled.");
+          return;
+        }
+      }
+
+      // Perform deletion
+      const result = hasLockedPrds
+        ? yield* repo.deleteFeatureForce(featureId)
+        : yield* repo.deleteFeature(featureId);
+
+      yield* Console.log(`Deleted ${result.deleted} PRD(s) from feature '${featureId}'`);
     },
     Effect.catchTag("PrdNotFoundError", (e) => Console.error(e.message)),
     Effect.catchTag("PrdLockedError", (e) => Console.error(e.message)),
+    Effect.catchTag("FeatureHasLockedPrdsError", (e) => Console.error(e.message)),
+    Effect.catchTag("PasswordNotConfiguredError", (e) => Console.error(e.message)),
+    Effect.catchTag("InvalidPasswordError", (e) => Console.error(e.message)),
   ),
-).pipe(Command.withDescription("Delete a PRD item (blocked if locked)"));
+).pipe(Command.withDescription("Delete a PRD item or entire feature (blocked if locked)"));
 
 const listCommand = Command.make(
   "list",

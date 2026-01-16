@@ -31,6 +31,12 @@ prdman update-status <feature-id> <prd-id> todo|done|sent-back
 # delete a PRD (blocked if locked)
 prdman delete <feature-id> <prd-id>
 
+# delete entire feature (all PRDs)
+prdman delete --yes <feature-id>
+
+# force delete feature with locked PRDs
+prdman delete --password "<password>" --yes <feature-id>
+
 # lock/unlock (requires password from ~/.config/prdman/password)
 prdman lock <feature-id> <prd-id> --password "<password>"
 prdman unlock <feature-id> <prd-id> --password "<password>"
@@ -103,6 +109,16 @@ prdman details payments PAY-0001
 
 ```bash
 prdman import ./prds.json
+```
+
+### Delete entire feature
+
+```bash
+# Delete all PRDs in a feature (prompts for confirmation)
+prdman delete --yes payments
+
+# Force delete feature with locked PRDs
+prdman delete --password "secret" --yes payments
 ```
 
 ## Import File Structure

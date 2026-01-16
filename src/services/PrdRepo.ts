@@ -1,6 +1,7 @@
 import { Context, Effect } from "effect"
 import type {
   DuplicateIdError,
+  FeatureHasLockedPrdsError,
   PrdLockedError,
   PrdNotFoundError,
 } from "../domain/errors.js"
@@ -64,5 +65,13 @@ export class PrdRepo extends Context.Tag("@prdman/PrdRepo")<
       { created: number; skipped: number },
       DuplicateIdError
     >
+
+    readonly deleteFeature: (
+      featureId: FeatureId
+    ) => Effect.Effect<{ deleted: number }, FeatureHasLockedPrdsError>
+
+    readonly deleteFeatureForce: (
+      featureId: FeatureId
+    ) => Effect.Effect<{ deleted: number }>
   }
 >() {}

@@ -1,6 +1,7 @@
 import { Effect, Layer } from "effect";
 import {
   DuplicateIdError,
+  FeatureHasLockedPrdsError,
   InvalidPasswordError,
   PasswordNotConfiguredError,
   PrdLockedError,
@@ -207,6 +208,38 @@ export class TestPrdRepo {
         }
 
         return { created, skipped };
+      }),
+
+    deleteFeature: (featureId: FeatureId) =>
+      Effect.gen(this, function* () {
+        const featureMap = this.store.get(featureId);
+        if (!featureMap || featureMap.size === 0) {
+          return { deleted: 0 };
+        }
+
+        const lockedIds = [...featureMap.values()]
+          .filter((item) => item.locked)
+          .map((item) => item.id);
+
+        if (lockedIds.length > 0) {
+          return yield* new FeatureHasLockedPrdsError({ featureId, lockedIds });
+        }
+
+        const deleted = featureMap.size;
+        this.store.delete(featureId);
+        return { deleted };
+      }),
+
+    deleteFeatureForce: (featureId: FeatureId) =>
+      Effect.sync(() => {
+        const featureMap = this.store.get(featureId);
+        if (!featureMap || featureMap.size === 0) {
+          return { deleted: 0 };
+        }
+
+        const deleted = featureMap.size;
+        this.store.delete(featureId);
+        return { deleted };
       }),
   });
 

@@ -511,6 +511,302 @@ describe("CLI Commands", () => {
         expect(errorLines.join("\n")).toContain("is locked");
       }),
     );
+
+    describe("feature deletion", () => {
+      it.effect(
+        "deletes all PRDs with --yes when none locked",
+        Effect.fn(function* () {
+          const { repo, testLayer } = createTestContext();
+
+          yield* Effect.provide(
+            Effect.gen(function* () {
+              const r = yield* PrdRepo;
+              yield* r.create(FeatureId.make("AUTH"), {
+                id: PrdId.make("AUTH-0001"),
+                priority: 1,
+                name: "First Item",
+                description: "Desc",
+                steps: [],
+                acceptanceCriteria: [],
+                status: "todo",
+              });
+              yield* r.create(FeatureId.make("AUTH"), {
+                id: PrdId.make("AUTH-0002"),
+                priority: 2,
+                name: "Second Item",
+                description: "Desc",
+                steps: [],
+                acceptanceCriteria: [],
+                status: "done",
+              });
+            }),
+            repo.layer,
+          );
+
+          yield* runCli(["delete", "--yes", "AUTH"], testLayer);
+
+          const lines = yield* MockConsole.getLines({ stripAnsi: true });
+          const output = lines.join("\n");
+          expect(output).toContain("The following 2 PRD(s) will be deleted:");
+          expect(output).toContain("AUTH-0001: First Item");
+          expect(output).toContain("AUTH-0002: Second Item");
+          expect(output).toContain("Deleted 2 PRD(s) from feature 'AUTH'");
+
+          // Verify all items deleted
+          const items = yield* Effect.provide(
+            PrdRepo.pipe(Effect.flatMap((r) => r.list(FeatureId.make("AUTH")))),
+            repo.layer,
+          );
+          expect(items.length).toBe(0);
+        }),
+      );
+
+      it.effect(
+        "fails with --yes when PRDs are locked without password",
+        Effect.fn(function* () {
+          const { repo, testLayer } = createTestContext("secret123");
+
+          yield* Effect.provide(
+            Effect.gen(function* () {
+              const r = yield* PrdRepo;
+              yield* r.create(FeatureId.make("AUTH"), {
+                id: PrdId.make("AUTH-0001"),
+                priority: 1,
+                name: "Unlocked Item",
+                description: "Desc",
+                steps: [],
+                acceptanceCriteria: [],
+                status: "todo",
+              });
+              yield* r.create(FeatureId.make("AUTH"), {
+                id: PrdId.make("AUTH-0002"),
+                priority: 2,
+                name: "Locked Item",
+                description: "Desc",
+                steps: [],
+                acceptanceCriteria: [],
+                status: "todo",
+              });
+              yield* r.lock(FeatureId.make("AUTH"), PrdId.make("AUTH-0002"));
+            }),
+            repo.layer,
+          );
+
+          yield* runCli(["delete", "--yes", "AUTH"], testLayer);
+
+          const errorLines = yield* MockConsole.getErrorLines({
+            stripAnsi: true,
+          });
+          const errorOutput = errorLines.join("\n");
+          expect(errorOutput).toContain("Cannot delete feature 'AUTH'");
+          expect(errorOutput).toContain("1 PRD(s) are locked");
+          expect(errorOutput).toContain("AUTH-0002");
+          expect(errorOutput).toContain("Use --password to force");
+
+          // Verify items still exist
+          const items = yield* Effect.provide(
+            PrdRepo.pipe(Effect.flatMap((r) => r.list(FeatureId.make("AUTH")))),
+            repo.layer,
+          );
+          expect(items.length).toBe(2);
+        }),
+      );
+
+      it.effect(
+        "succeeds with --password --yes when PRDs are locked",
+        Effect.fn(function* () {
+          const { repo, testLayer } = createTestContext("secret123");
+
+          yield* Effect.provide(
+            Effect.gen(function* () {
+              const r = yield* PrdRepo;
+              yield* r.create(FeatureId.make("AUTH"), {
+                id: PrdId.make("AUTH-0001"),
+                priority: 1,
+                name: "Unlocked Item",
+                description: "Desc",
+                steps: [],
+                acceptanceCriteria: [],
+                status: "todo",
+              });
+              yield* r.create(FeatureId.make("AUTH"), {
+                id: PrdId.make("AUTH-0002"),
+                priority: 2,
+                name: "Locked Item",
+                description: "Desc",
+                steps: [],
+                acceptanceCriteria: [],
+                status: "todo",
+              });
+              yield* r.lock(FeatureId.make("AUTH"), PrdId.make("AUTH-0002"));
+            }),
+            repo.layer,
+          );
+
+          yield* runCli(
+            ["delete", "--password", "secret123", "--yes", "AUTH"],
+            testLayer,
+          );
+
+          const lines = yield* MockConsole.getLines({ stripAnsi: true });
+          const output = lines.join("\n");
+          expect(output).toContain("The following 2 PRD(s) will be deleted:");
+          expect(output).toContain("AUTH-0002: Locked Item [LOCKED]");
+          expect(output).toContain("Deleted 2 PRD(s) from feature 'AUTH'");
+
+          // Verify all items deleted
+          const items = yield* Effect.provide(
+            PrdRepo.pipe(Effect.flatMap((r) => r.list(FeatureId.make("AUTH")))),
+            repo.layer,
+          );
+          expect(items.length).toBe(0);
+        }),
+      );
+
+      it.effect(
+        "shows message for empty feature",
+        Effect.fn(function* () {
+          const { testLayer } = createTestContext();
+
+          yield* runCli(["delete", "--yes", "NONEXISTENT"], testLayer);
+
+          const lines = yield* MockConsole.getLines({ stripAnsi: true });
+          expect(lines.join("\n")).toContain(
+            "No PRDs found for feature 'NONEXISTENT'",
+          );
+        }),
+      );
+
+      it.effect(
+        "single PRD deletion still works with prd-id argument",
+        Effect.fn(function* () {
+          const { repo, testLayer } = createTestContext();
+
+          yield* Effect.provide(
+            Effect.gen(function* () {
+              const r = yield* PrdRepo;
+              yield* r.create(FeatureId.make("AUTH"), {
+                id: PrdId.make("AUTH-0001"),
+                priority: 1,
+                name: "Keep This",
+                description: "Desc",
+                steps: [],
+                acceptanceCriteria: [],
+                status: "todo",
+              });
+              yield* r.create(FeatureId.make("AUTH"), {
+                id: PrdId.make("AUTH-0002"),
+                priority: 2,
+                name: "Delete This",
+                description: "Desc",
+                steps: [],
+                acceptanceCriteria: [],
+                status: "todo",
+              });
+            }),
+            repo.layer,
+          );
+
+          yield* runCli(["delete", "AUTH", "AUTH-0002"], testLayer);
+
+          const lines = yield* MockConsole.getLines({ stripAnsi: true });
+          expect(lines.join("\n")).toContain("Deleted PRD item: AUTH-0002");
+
+          // Verify only one item deleted
+          const items = yield* Effect.provide(
+            PrdRepo.pipe(Effect.flatMap((r) => r.list(FeatureId.make("AUTH")))),
+            repo.layer,
+          );
+          expect(items.length).toBe(1);
+          expect(items[0]?.id).toBe("AUTH-0001");
+        }),
+      );
+
+      it.effect(
+        "fails with wrong password for locked PRDs",
+        Effect.fn(function* () {
+          const { repo, testLayer } = createTestContext("secret123");
+
+          yield* Effect.provide(
+            Effect.gen(function* () {
+              const r = yield* PrdRepo;
+              yield* r.create(FeatureId.make("AUTH"), {
+                id: PrdId.make("AUTH-0001"),
+                priority: 1,
+                name: "Locked Item",
+                description: "Desc",
+                steps: [],
+                acceptanceCriteria: [],
+                status: "todo",
+              });
+              yield* r.lock(FeatureId.make("AUTH"), PrdId.make("AUTH-0001"));
+            }),
+            repo.layer,
+          );
+
+          yield* runCli(
+            ["delete", "--password", "wrong", "--yes", "AUTH"],
+            testLayer,
+          );
+
+          const errorLines = yield* MockConsole.getErrorLines({
+            stripAnsi: true,
+          });
+          expect(errorLines.join("\n")).toContain("Invalid password");
+
+          // Verify items still exist
+          const items = yield* Effect.provide(
+            PrdRepo.pipe(Effect.flatMap((r) => r.list(FeatureId.make("AUTH")))),
+            repo.layer,
+          );
+          expect(items.length).toBe(1);
+        }),
+      );
+
+      it.effect(
+        "shows locked indicator in deletion list",
+        Effect.fn(function* () {
+          const { repo, testLayer } = createTestContext("secret123");
+
+          yield* Effect.provide(
+            Effect.gen(function* () {
+              const r = yield* PrdRepo;
+              yield* r.create(FeatureId.make("AUTH"), {
+                id: PrdId.make("AUTH-0001"),
+                priority: 1,
+                name: "Unlocked Item",
+                description: "Desc",
+                steps: [],
+                acceptanceCriteria: [],
+                status: "todo",
+              });
+              yield* r.create(FeatureId.make("AUTH"), {
+                id: PrdId.make("AUTH-0002"),
+                priority: 2,
+                name: "Locked Item",
+                description: "Desc",
+                steps: [],
+                acceptanceCriteria: [],
+                status: "todo",
+              });
+              yield* r.lock(FeatureId.make("AUTH"), PrdId.make("AUTH-0002"));
+            }),
+            repo.layer,
+          );
+
+          yield* runCli(
+            ["delete", "--password", "secret123", "--yes", "AUTH"],
+            testLayer,
+          );
+
+          const lines = yield* MockConsole.getLines({ stripAnsi: true });
+          const output = lines.join("\n");
+          expect(output).toContain("AUTH-0001: Unlocked Item");
+          expect(output).not.toContain("AUTH-0001: Unlocked Item [LOCKED]");
+          expect(output).toContain("AUTH-0002: Locked Item [LOCKED]");
+        }),
+      );
+    });
   });
 
   describe("lock", () => {
