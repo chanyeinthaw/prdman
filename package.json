@@ -5,11 +5,15 @@
   "private": true,
   "scripts": {
     "prepare": "effect-language-service patch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
     "@effect/language-service": "^0.65.0",
-    "@types/bun": "latest"
+    "@effect/vitest": "^0.27.0",
+    "@types/bun": "latest",
+    "vitest": "^4.0.17"
   },
   "peerDependencies": {
     "typescript": "^5"

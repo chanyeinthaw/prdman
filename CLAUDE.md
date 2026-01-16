@@ -35,14 +35,20 @@ Never guess at Effect patterns - check the guide first.
 
 ## Testing
 
-Use `bun test` to run tests.
+Use `bun run test` (vitest) for testing Effect code with `@effect/vitest`.
 
-```ts#index.test.ts
-import { test, expect } from "bun:test";
+```ts#example.test.ts
+import { Effect } from "effect"
+import { describe, expect, it } from "@effect/vitest"
 
-test("hello world", () => {
-  expect(1).toBe(1);
-});
+describe("Example", () => {
+  it.effect("works with effects", () =>
+    Effect.gen(function* () {
+      const result = yield* Effect.succeed(1 + 1)
+      expect(result).toBe(2)
+    })
+  )
+})
 ```
 
 ## Frontend
