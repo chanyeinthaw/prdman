@@ -1,51 +1,51 @@
 ---
 name: prdman
-description: PRD management CLI for tracking feature requirements. Use when managing PRDs, creating feature specs, or tracking implementation status.
+description: PRD management CLI for tracking PRD requirements. Use when managing PRDs, creating story specs, or tracking implementation status.
 ---
 
 # prdman - PRD Management CLI
 
-Manage Product Requirement Documents scoped by feature.
+Manage Product Requirement Documents with stories scoped by PRD.
 
 ## Quick Reference
 
 ```bash
-# create a PRD
-prdman create <feature-id> '<json>'
+# create a story
+prdman create <prd-id> '<json>'
 
-# list all features
+# list all PRDs
 prdman list
 
-# list PRDs for a feature (sorted by priority)
-prdman list <feature-id>
+# list stories for a PRD (sorted by priority)
+prdman list <prd-id>
 
-# show details of a PRD item
-prdman details <feature-id> <prd-id>
+# show details of a story
+prdman details <prd-id> <story-id>
 
-# update a PRD (blocked if locked)
-prdman update <feature-id> <prd-id> '<partial-json>'
+# update a story (blocked if locked)
+prdman update <prd-id> <story-id> '<partial-json>'
 
 # update status only (ignores lock)
-prdman update-status <feature-id> <prd-id> todo|done|sent-back
+prdman update-status <prd-id> <story-id> todo|done|sent-back
 
-# delete a PRD (blocked if locked)
-prdman delete <feature-id> <prd-id>
+# delete a story (blocked if locked)
+prdman delete <prd-id> <story-id>
 
-# delete entire feature (all PRDs)
-prdman delete --yes <feature-id>
+# delete entire PRD (all stories)
+prdman delete --yes <prd-id>
 
-# force delete feature with locked PRDs
-prdman delete --password "<password>" --yes <feature-id>
+# force delete PRD with locked stories
+prdman delete --password "<password>" --yes <prd-id>
 
 # lock/unlock (requires password from ~/.config/prdman/password)
-prdman lock <feature-id> <prd-id> --password "<password>"
-prdman unlock <feature-id> <prd-id> --password "<password>"
+prdman lock <prd-id> <story-id> --password "<password>"
+prdman unlock <prd-id> <story-id> --password "<password>"
 
-# import PRDs from a JSON file
+# import stories from a JSON file
 prdman import <file-path>
 ```
 
-## PRD JSON Structure
+## Story JSON Structure
 
 ```json
 {
@@ -65,7 +65,7 @@ prdman import <file-path>
 
 ## ID Format
 
-PRD IDs follow `XXX-YYYY` pattern (e.g., `AUTH-0001`, `API-0042`).
+Story IDs follow `XXX-YYYY` pattern (e.g., `AUTH-0001`, `API-0042`).
 
 ## Status Values
 
@@ -75,49 +75,49 @@ PRD IDs follow `XXX-YYYY` pattern (e.g., `AUTH-0001`, `API-0042`).
 
 ## Common Workflows
 
-### Create new feature PRDs
+### Create new PRD stories
 
 ```bash
 prdman create payments '{"id":"PAY-0001","priority":1,"name":"Stripe Integration","description":"Add Stripe payments","steps":["Install SDK","Create checkout"],"status":"todo"}'
 ```
 
-### Mark PRD complete
+### Mark story complete
 
 ```bash
 prdman update-status payments PAY-0001 done
 ```
 
-### View all PRDs for feature
+### View all stories for PRD
 
 ```bash
 prdman list payments
 ```
 
-### View all features
+### View all PRDs
 
 ```bash
 prdman list
 ```
 
-### View PRD details
+### View story details
 
 ```bash
 prdman details payments PAY-0001
 ```
 
-### Import PRDs from file
+### Import stories from file
 
 ```bash
-prdman import ./prds.json
+prdman import ./stories.json
 ```
 
-### Delete entire feature
+### Delete entire PRD
 
 ```bash
-# Delete all PRDs in a feature (prompts for confirmation)
+# Delete all stories in a PRD (prompts for confirmation)
 prdman delete --yes payments
 
-# Force delete feature with locked PRDs
+# Force delete PRD with locked stories
 prdman delete --password "secret" --yes payments
 ```
 
@@ -125,7 +125,7 @@ prdman delete --password "secret" --yes payments
 
 ```json
 {
-  "id": "feature-id",
+  "id": "prd-id",
   "items": [
     {
       "id": "AUTH-0001",

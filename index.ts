@@ -2,16 +2,16 @@ import { Command, ValidationError } from "@effect/cli";
 import { BunContext, BunRuntime } from "@effect/platform-bun";
 import { Console, Effect, Layer, LogLevel, Logger } from "effect";
 import { rootCommand } from "./src/cli/commands.js";
-import { PRD_INPUT_HELP } from "./src/domain/PrdItem.js";
+import { STORY_INPUT_HELP } from "./src/domain/Story.js";
 import { PasswordService } from "./src/services/PasswordService.js";
-import { PrdRepoJsonLayer } from "./src/services/PrdRepoJson.js";
+import { StoryRepoJsonLayer } from "./src/services/StoryRepoJson.js";
 
 const cli = Command.run(rootCommand, {
   name: "prdman",
   version: "1.0.0",
 });
 
-const MainLayer = Layer.mergeAll(PrdRepoJsonLayer, PasswordService.layer).pipe(
+const MainLayer = Layer.mergeAll(StoryRepoJsonLayer, PasswordService.layer).pipe(
   Layer.provideMerge(BunContext.layer),
 );
 
@@ -38,7 +38,7 @@ const program = cli(process.argv).pipe(
     ValidationError.isValidationError,
     Effect.fn(function* (error) {
       if (isJsonArgError(error)) {
-        yield* Console.error(`\n${PRD_INPUT_HELP}`);
+        yield* Console.error(`\n${STORY_INPUT_HELP}`);
       }
     }),
   ),

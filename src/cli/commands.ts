@@ -2,43 +2,43 @@ import { Args, Command, Options, Prompt } from "@effect/cli";
 import { FileSystem } from "@effect/platform";
 import { Console, Effect, Option, Schema } from "effect";
 import {
-  FeatureId,
-  ImportFileJson,
   PrdId,
-  PrdItem,
-  PrdItemInputJson,
-  PrdItemPartialInputJson,
-  PRD_INPUT_HELP,
+  ImportFileJson,
+  StoryId,
+  StoryItem,
+  StoryItemInputJson,
+  StoryItemPartialInputJson,
+  STORY_INPUT_HELP,
   Status,
-} from "../domain/PrdItem.js";
-import { InvalidPrdInputError } from "../domain/errors.js";
+} from "../domain/Story.js";
+import { InvalidStoryInputError } from "../domain/errors.js";
 import { PasswordService } from "../services/PasswordService.js";
-import { PrdRepo } from "../services/PrdRepo.js";
-
-const featureIdArg = Args.text({ name: "feature-id" }).pipe(
-  Args.withDescription("Feature ID to scope PRD items"),
-  Args.withSchema(FeatureId),
-);
-
-const optionalFeatureIdArg = Args.text({ name: "feature-id" }).pipe(
-  Args.withDescription("Feature ID to scope PRD items (optional - lists features if omitted)"),
-  Args.withSchema(FeatureId),
-  Args.optional,
-);
+import { StoryRepo } from "../services/StoryRepo.js";
 
 const prdIdArg = Args.text({ name: "prd-id" }).pipe(
-  Args.withDescription("PRD item ID (format: XXX-YYYY)"),
+  Args.withDescription("PRD ID to scope stories"),
   Args.withSchema(PrdId),
 );
 
 const optionalPrdIdArg = Args.text({ name: "prd-id" }).pipe(
-  Args.withDescription("PRD item ID (format: XXX-YYYY) - if omitted, deletes entire feature"),
+  Args.withDescription("PRD ID to scope stories (optional - lists PRDs if omitted)"),
   Args.withSchema(PrdId),
   Args.optional,
 );
 
+const storyIdArg = Args.text({ name: "story-id" }).pipe(
+  Args.withDescription("Story ID (format: XXX-YYYY)"),
+  Args.withSchema(StoryId),
+);
+
+const optionalStoryIdArg = Args.text({ name: "story-id" }).pipe(
+  Args.withDescription("Story ID (format: XXX-YYYY) - if omitted, deletes entire PRD"),
+  Args.withSchema(StoryId),
+  Args.optional,
+);
+
 const jsonArg = Args.text({ name: "json" }).pipe(
-  Args.withDescription("PRD item as JSON string"),
+  Args.withDescription("Story as JSON string"),
 );
 
 const statusChoices: ReadonlyArray<[string, Status]> = [
@@ -56,7 +56,7 @@ const passwordOption = Options.text("password").pipe(
 
 const optionalPasswordOption = Options.text("password").pipe(
   Options.withAlias("p"),
-  Options.withDescription("Password to force deletion of locked PRDs"),
+  Options.withDescription("Password to force deletion of locked stories"),
   Options.optional,
 );
 
@@ -70,77 +70,77 @@ const filePathArg = Args.text({ name: "file-path" }).pipe(
   Args.withDescription("Path to JSON file to import"),
 );
 
-const formatPrdItem = (item: PrdItem): string => {
-  const lockIndicator = item.locked ? " [LOCKED]" : "";
-  const statusIndicator = `[${item.status}]`;
-  return `${statusIndicator} ${item.id}${lockIndicator} (priority: ${item.priority}) - ${item.name}`;
+const formatStoryItem = (story: StoryItem): string => {
+  const lockIndicator = story.locked ? " [LOCKED]" : "";
+  const statusIndicator = `[${story.status}]`;
+  return `${statusIndicator} ${story.id}${lockIndicator} (priority: ${story.priority}) - ${story.name}`;
 };
 
-const formatPrdItemDetail = (item: PrdItem): string => {
+const formatStoryItemDetail = (story: StoryItem): string => {
   const lines = [
-    `ID: ${item.id}${item.locked ? " [LOCKED]" : ""}`,
-    `Priority: ${item.priority}`,
-    `Name: ${item.name}`,
-    `Status: ${item.status}`,
-    `Description: ${item.description}`,
+    `ID: ${story.id}${story.locked ? " [LOCKED]" : ""}`,
+    `Priority: ${story.priority}`,
+    `Name: ${story.name}`,
+    `Status: ${story.status}`,
+    `Description: ${story.description}`,
     `Steps:`,
-    ...item.steps.map((s, i) => `  ${i + 1}. ${s}`),
+    ...story.steps.map((s, i) => `  ${i + 1}. ${s}`),
   ];
 
-  if (item.acceptanceCriteria.length > 0) {
+  if (story.acceptanceCriteria.length > 0) {
     lines.push(`Acceptance Criteria:`);
-    lines.push(...item.acceptanceCriteria.map((c, i) => `  ${i + 1}. ${c}`));
+    lines.push(...story.acceptanceCriteria.map((c, i) => `  ${i + 1}. ${c}`));
   }
 
-  if (item.note) {
-    lines.push(`Note: ${item.note}`);
+  if (story.note) {
+    lines.push(`Note: ${story.note}`);
   }
 
-  lines.push(`Created: ${item.createdAt.toISOString()}`);
-  lines.push(`Updated: ${item.updatedAt.toISOString()}`);
+  lines.push(`Created: ${story.createdAt.toISOString()}`);
+  lines.push(`Updated: ${story.updatedAt.toISOString()}`);
 
   return lines.join("\n");
 };
 
 const createCommand = Command.make(
   "create",
-  { featureId: featureIdArg, json: jsonArg },
+  { prdId: prdIdArg, json: jsonArg },
   Effect.fn(
-    function* ({ featureId, json }) {
-      const repo = yield* PrdRepo;
+    function* ({ prdId, json }) {
+      const repo = yield* StoryRepo;
 
-      const input = yield* Schema.decodeUnknown(PrdItemInputJson)(json).pipe(
+      const input = yield* Schema.decodeUnknown(StoryItemInputJson)(json).pipe(
         Effect.mapError(
           (e) =>
-            new InvalidPrdInputError({
+            new InvalidStoryInputError({
               reason: e.message,
             }),
         ),
       );
 
-      const item = yield* repo.create(featureId, input);
-      yield* Console.log(`Created PRD item: ${item.id}`);
-      yield* Console.log(formatPrdItemDetail(item));
+      const story = yield* repo.create(prdId, input);
+      yield* Console.log(`Created story: ${story.id}`);
+      yield* Console.log(formatStoryItemDetail(story));
     },
-    Effect.catchTag("InvalidPrdInputError", (e) =>
-      Console.error(`${e.message}\n\n${PRD_INPUT_HELP}`),
+    Effect.catchTag("InvalidStoryInputError", (e) =>
+      Console.error(`${e.message}\n\n${STORY_INPUT_HELP}`),
     ),
   ),
-).pipe(Command.withDescription("Create a new PRD item"));
+).pipe(Command.withDescription("Create a new story"));
 
 const updateCommand = Command.make(
   "update",
-  { featureId: featureIdArg, prdId: prdIdArg, json: jsonArg },
+  { prdId: prdIdArg, storyId: storyIdArg, json: jsonArg },
   Effect.fn(
-    function* ({ featureId, prdId, json }) {
-      const repo = yield* PrdRepo;
+    function* ({ prdId, storyId, json }) {
+      const repo = yield* StoryRepo;
 
-      const partial = yield* Schema.decodeUnknown(PrdItemPartialInputJson)(
+      const partial = yield* Schema.decodeUnknown(StoryItemPartialInputJson)(
         json,
       ).pipe(
         Effect.mapError(
           (e) =>
-            new InvalidPrdInputError({
+            new InvalidStoryInputError({
               reason: e.message,
             }),
         ),
@@ -156,79 +156,79 @@ const updateCommand = Command.make(
         );
       }
 
-      const item = yield* repo.update(featureId, prdId, partial);
-      yield* Console.log(`Updated PRD item: ${item.id}`);
-      yield* Console.log(formatPrdItemDetail(item));
+      const story = yield* repo.update(prdId, storyId, partial);
+      yield* Console.log(`Updated story: ${story.id}`);
+      yield* Console.log(formatStoryItemDetail(story));
     },
-    Effect.catchTag("InvalidPrdInputError", (e) =>
-      Console.error(`${e.message}\n\n${PRD_INPUT_HELP}`),
+    Effect.catchTag("InvalidStoryInputError", (e) =>
+      Console.error(`${e.message}\n\n${STORY_INPUT_HELP}`),
     ),
-    Effect.catchTag("PrdNotFoundError", (e) => Console.error(e.message)),
-    Effect.catchTag("PrdLockedError", (e) => Console.error(e.message)),
+    Effect.catchTag("StoryNotFoundError", (e) => Console.error(e.message)),
+    Effect.catchTag("StoryLockedError", (e) => Console.error(e.message)),
   ),
-).pipe(Command.withDescription("Update a PRD item (blocked if locked)"));
+).pipe(Command.withDescription("Update a story (blocked if locked)"));
 
 const updateStatusCommand = Command.make(
   "update-status",
-  { featureId: featureIdArg, prdId: prdIdArg, status: statusArg },
+  { prdId: prdIdArg, storyId: storyIdArg, status: statusArg },
   Effect.fn(
-    function* ({ featureId, prdId, status }) {
-      const repo = yield* PrdRepo;
-      const item = yield* repo.updateStatus(featureId, prdId, status);
-      yield* Console.log(`Updated status of ${item.id} to: ${status}`);
+    function* ({ prdId, storyId, status }) {
+      const repo = yield* StoryRepo;
+      const story = yield* repo.updateStatus(prdId, storyId, status);
+      yield* Console.log(`Updated status of ${story.id} to: ${status}`);
     },
-    Effect.catchTag("PrdNotFoundError", (e) => Console.error(e.message)),
+    Effect.catchTag("StoryNotFoundError", (e) => Console.error(e.message)),
   ),
-).pipe(Command.withDescription("Update PRD status (ignores lock)"));
+).pipe(Command.withDescription("Update story status (ignores lock)"));
 
-const formatPrdForDeletion = (item: PrdItem): string => {
-  const lockIndicator = item.locked ? " [LOCKED]" : "";
-  return `- ${item.id}: ${item.name}${lockIndicator}`;
+const formatStoryForDeletion = (story: StoryItem): string => {
+  const lockIndicator = story.locked ? " [LOCKED]" : "";
+  return `- ${story.id}: ${story.name}${lockIndicator}`;
 };
 
 const deleteCommand = Command.make(
   "delete",
-  { featureId: featureIdArg, prdId: optionalPrdIdArg, password: optionalPasswordOption, yes: yesOption },
+  { prdId: prdIdArg, storyId: optionalStoryIdArg, password: optionalPasswordOption, yes: yesOption },
   Effect.fn(
-    function* ({ featureId, prdId, password, yes }) {
-      const repo = yield* PrdRepo;
+    function* ({ prdId, storyId, password, yes }) {
+      const repo = yield* StoryRepo;
 
-      // Single PRD deletion (existing behavior)
-      if (Option.isSome(prdId)) {
-        yield* repo.delete(featureId, prdId.value);
-        yield* Console.log(`Deleted PRD item: ${prdId.value}`);
+      // Single story deletion (existing behavior)
+      if (Option.isSome(storyId)) {
+        yield* repo.delete(prdId, storyId.value);
+        yield* Console.log(`Deleted story: ${storyId.value}`);
         return;
       }
 
-      // Feature deletion flow
-      const items = yield* repo.list(featureId);
+      // PRD deletion flow
+      const stories = yield* repo.list(prdId);
 
-      if (items.length === 0) {
-        yield* Console.log(`No PRDs found for feature '${featureId}'`);
+      if (stories.length === 0) {
+        yield* Console.log(`No stories found for PRD '${prdId}'`);
         return;
       }
 
-      // Check for locked PRDs
-      const lockedItems = items.filter((item) => item.locked);
-      const hasLockedPrds = lockedItems.length > 0;
+      // Check for locked stories
+      const lockedStories = stories.filter((story) => story.locked);
+      const hasLockedStories = lockedStories.length > 0;
 
-      // Display PRDs that will be deleted
-      yield* Console.log(`The following ${items.length} PRD(s) will be deleted:\n`);
-      for (const item of items) {
-        yield* Console.log(formatPrdForDeletion(item));
+      // Display stories that will be deleted
+      yield* Console.log(`The following ${stories.length} story(s) will be deleted:\n`);
+      for (const story of stories) {
+        yield* Console.log(formatStoryForDeletion(story));
       }
       yield* Console.log("");
 
-      // Require password for locked PRDs
-      if (hasLockedPrds && Option.isNone(password)) {
+      // Require password for locked stories
+      if (hasLockedStories && Option.isNone(password)) {
         yield* Console.error(
-          `Cannot delete feature '${featureId}': ${lockedItems.length} PRD(s) are locked: [${lockedItems.map((i) => i.id).join(", ")}]. Use --password to force.`
+          `Cannot delete PRD '${prdId}': ${lockedStories.length} story(s) are locked: [${lockedStories.map((s) => s.id).join(", ")}]. Use --password to force.`
         );
         return;
       }
 
-      // Verify password if provided and there are locked PRDs
-      if (hasLockedPrds && Option.isSome(password)) {
+      // Verify password if provided and there are locked stories
+      if (hasLockedStories && Option.isSome(password)) {
         const passwordService = yield* PasswordService;
         yield* passwordService.verify(password.value);
       }
@@ -236,7 +236,7 @@ const deleteCommand = Command.make(
       // Confirmation prompt (unless --yes flag is set)
       if (!yes) {
         const confirmed = yield* Prompt.confirm({
-          message: `Are you sure you want to delete all ${items.length} PRD(s) from feature '${featureId}'?`,
+          message: `Are you sure you want to delete all ${stories.length} story(s) from PRD '${prdId}'?`,
           initial: false,
         });
 
@@ -247,117 +247,117 @@ const deleteCommand = Command.make(
       }
 
       // Perform deletion
-      const result = hasLockedPrds
-        ? yield* repo.deleteFeatureForce(featureId)
-        : yield* repo.deleteFeature(featureId);
+      const result = hasLockedStories
+        ? yield* repo.deletePrdForce(prdId)
+        : yield* repo.deletePrd(prdId);
 
-      yield* Console.log(`Deleted ${result.deleted} PRD(s) from feature '${featureId}'`);
+      yield* Console.log(`Deleted ${result.deleted} story(s) from PRD '${prdId}'`);
     },
-    Effect.catchTag("PrdNotFoundError", (e) => Console.error(e.message)),
-    Effect.catchTag("PrdLockedError", (e) => Console.error(e.message)),
-    Effect.catchTag("FeatureHasLockedPrdsError", (e) => Console.error(e.message)),
+    Effect.catchTag("StoryNotFoundError", (e) => Console.error(e.message)),
+    Effect.catchTag("StoryLockedError", (e) => Console.error(e.message)),
+    Effect.catchTag("PrdHasLockedStoriesError", (e) => Console.error(e.message)),
     Effect.catchTag("PasswordNotConfiguredError", (e) => Console.error(e.message)),
     Effect.catchTag("InvalidPasswordError", (e) => Console.error(e.message)),
   ),
-).pipe(Command.withDescription("Delete a PRD item or entire feature (blocked if locked)"));
+).pipe(Command.withDescription("Delete a story or entire PRD (blocked if locked)"));
 
 const listCommand = Command.make(
   "list",
-  { featureId: optionalFeatureIdArg },
-  Effect.fn(function* ({ featureId }) {
-    const repo = yield* PrdRepo;
+  { prdId: optionalPrdIdArg },
+  Effect.fn(function* ({ prdId }) {
+    const repo = yield* StoryRepo;
 
-    if (Option.isNone(featureId)) {
-      const features = yield* repo.listFeatures();
+    if (Option.isNone(prdId)) {
+      const prds = yield* repo.listPrds();
 
-      if (features.length === 0) {
-        yield* Console.log("No features found");
+      if (prds.length === 0) {
+        yield* Console.log("No PRDs found");
         return;
       }
 
-      yield* Console.log("Features:\n");
-      for (const feature of features) {
-        yield* Console.log(`  ${feature}`);
+      yield* Console.log("PRDs:\n");
+      for (const prd of prds) {
+        yield* Console.log(`  ${prd}`);
       }
       return;
     }
 
-    const items = yield* repo.list(featureId.value);
+    const stories = yield* repo.list(prdId.value);
 
-    if (items.length === 0) {
-      yield* Console.log(`No PRD items found for feature: ${featureId.value}`);
+    if (stories.length === 0) {
+      yield* Console.log(`No stories found for PRD: ${prdId.value}`);
       return;
     }
 
-    yield* Console.log(`PRD items for feature: ${featureId.value}\n`);
-    for (const item of items) {
-      yield* Console.log(formatPrdItem(item));
+    yield* Console.log(`Stories for PRD: ${prdId.value}\n`);
+    for (const story of stories) {
+      yield* Console.log(formatStoryItem(story));
     }
   }),
-).pipe(Command.withDescription("List PRD items sorted by priority (or list features if no feature-id)"));
+).pipe(Command.withDescription("List stories sorted by priority (or list PRDs if no prd-id)"));
 
 const detailsCommand = Command.make(
   "details",
-  { featureId: featureIdArg, prdId: prdIdArg },
+  { prdId: prdIdArg, storyId: storyIdArg },
   Effect.fn(
-    function* ({ featureId, prdId }) {
-      const repo = yield* PrdRepo;
-      const item = yield* repo.get(featureId, prdId);
-      yield* Console.log(formatPrdItemDetail(item));
+    function* ({ prdId, storyId }) {
+      const repo = yield* StoryRepo;
+      const story = yield* repo.get(prdId, storyId);
+      yield* Console.log(formatStoryItemDetail(story));
     },
-    Effect.catchTag("PrdNotFoundError", (e) => Console.error(e.message)),
+    Effect.catchTag("StoryNotFoundError", (e) => Console.error(e.message)),
   ),
-).pipe(Command.withDescription("Show details of a PRD item"));
+).pipe(Command.withDescription("Show details of a story"));
 
 const lockCommand = Command.make(
   "lock",
-  { featureId: featureIdArg, prdId: prdIdArg, password: passwordOption },
+  { prdId: prdIdArg, storyId: storyIdArg, password: passwordOption },
   Effect.fn(
-    function* ({ featureId, prdId, password }) {
+    function* ({ prdId, storyId, password }) {
       const passwordService = yield* PasswordService;
-      const repo = yield* PrdRepo;
+      const repo = yield* StoryRepo;
 
       yield* passwordService.verify(password);
-      yield* repo.lock(featureId, prdId);
-      yield* Console.log(`Locked PRD item: ${prdId}`);
+      yield* repo.lock(prdId, storyId);
+      yield* Console.log(`Locked story: ${storyId}`);
     },
     Effect.catchTag("PasswordNotConfiguredError", (e) =>
       Console.error(e.message),
     ),
     Effect.catchTag("InvalidPasswordError", (e) => Console.error(e.message)),
-    Effect.catchTag("PrdNotFoundError", (e) => Console.error(e.message)),
+    Effect.catchTag("StoryNotFoundError", (e) => Console.error(e.message)),
   ),
-).pipe(Command.withDescription("Lock a PRD item (requires password)"));
+).pipe(Command.withDescription("Lock a story (requires password)"));
 
 const unlockCommand = Command.make(
   "unlock",
-  { featureId: featureIdArg, prdId: prdIdArg, password: passwordOption },
+  { prdId: prdIdArg, storyId: storyIdArg, password: passwordOption },
   Effect.fn(
-    function* ({ featureId, prdId, password }) {
+    function* ({ prdId, storyId, password }) {
       const passwordService = yield* PasswordService;
-      const repo = yield* PrdRepo;
+      const repo = yield* StoryRepo;
 
       yield* passwordService.verify(password);
-      yield* repo.unlock(featureId, prdId);
-      yield* Console.log(`Unlocked PRD item: ${prdId}`);
+      yield* repo.unlock(prdId, storyId);
+      yield* Console.log(`Unlocked story: ${storyId}`);
     },
     Effect.catchTag("PasswordNotConfiguredError", (e) =>
       Console.error(e.message),
     ),
     Effect.catchTag("InvalidPasswordError", (e) => Console.error(e.message)),
-    Effect.catchTag("PrdNotFoundError", (e) => Console.error(e.message)),
+    Effect.catchTag("StoryNotFoundError", (e) => Console.error(e.message)),
   ),
-).pipe(Command.withDescription("Unlock a PRD item (requires password)"));
+).pipe(Command.withDescription("Unlock a story (requires password)"));
 
 const IMPORT_FILE_HELP = `
 Expected import file structure:
 {
-  "id": "feature-id",        // required, feature ID to import items into
-  "items": [                 // required, array of PRD items
+  "id": "prd-id",            // required, PRD ID to import stories into
+  "items": [                 // required, array of stories
     {
       "id": "XXX-YYYY",
       "priority": 1,
-      "name": "Feature name",
+      "name": "Story name",
       "description": "Details...",
       "steps": ["Step 1", "Step 2"],
       "acceptanceCriteria": ["..."],  // optional
@@ -373,32 +373,32 @@ const importCommand = Command.make(
   { filePath: filePathArg },
   Effect.fn(
     function* ({ filePath }) {
-      const repo = yield* PrdRepo;
+      const repo = yield* StoryRepo;
       const fs = yield* FileSystem.FileSystem;
 
       const content = yield* fs.readFileString(filePath).pipe(
-        Effect.mapError(() => new InvalidPrdInputError({ reason: `Failed to read file: ${filePath}` })),
+        Effect.mapError(() => new InvalidStoryInputError({ reason: `Failed to read file: ${filePath}` })),
       );
 
       const importData = yield* Schema.decodeUnknown(ImportFileJson)(content).pipe(
         Effect.mapError(
           (e) =>
-            new InvalidPrdInputError({
+            new InvalidStoryInputError({
               reason: e.message,
             }),
         ),
       );
 
       const { created, skipped } = yield* repo.importFile(importData);
-      yield* Console.log(`Imported PRDs for feature: ${importData.id}`);
+      yield* Console.log(`Imported stories for PRD: ${importData.id}`);
       yield* Console.log(`  Created: ${created}`);
       yield* Console.log(`  Skipped (duplicate IDs): ${skipped}`);
     },
-    Effect.catchTag("InvalidPrdInputError", (e) =>
+    Effect.catchTag("InvalidStoryInputError", (e) =>
       Console.error(`${e.message}\n\n${IMPORT_FILE_HELP}`),
     ),
   ),
-).pipe(Command.withDescription("Import PRD items from a JSON file"));
+).pipe(Command.withDescription("Import stories from a JSON file"));
 
 export const rootCommand = Command.make("prdman", {}).pipe(
   Command.withDescription("PRD Management CLI"),

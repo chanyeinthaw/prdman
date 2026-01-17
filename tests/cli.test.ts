@@ -3,8 +3,8 @@ import { FileSystem } from "@effect/platform";
 import { Console, Effect, Layer } from "effect";
 import { describe, expect, it } from "@effect/vitest";
 import { rootCommand } from "../src/cli/commands.js";
-import { FeatureId, PrdId } from "../src/domain/PrdItem.js";
-import { PrdRepo } from "../src/services/PrdRepo.js";
+import { PrdId, StoryId } from "../src/domain/Story.js";
+import { StoryRepo } from "../src/services/StoryRepo.js";
 import { createTestLayer } from "./test-layers.js";
 import * as MockConsole from "./mock-console.js";
 
@@ -65,7 +65,7 @@ const runCli = (args: string[], layer: Layer.Layer<any>) =>
 describe("CLI Commands", () => {
   describe("create", () => {
     it.effect(
-      "creates a new PRD item",
+      "creates a new story",
       Effect.fn(function* () {
         const { repo, testLayer } = createTestContext();
 
@@ -81,15 +81,15 @@ describe("CLI Commands", () => {
         yield* runCli(["create", "AUTH", json], testLayer);
 
         const lines = yield* MockConsole.getLines({ stripAnsi: true });
-        expect(lines.join("\n")).toContain("Created PRD item: AUTH-0001");
+        expect(lines.join("\n")).toContain("Created story: AUTH-0001");
 
-        // Verify item was created
-        const items = yield* Effect.provide(
-          PrdRepo.pipe(Effect.flatMap((r) => r.list(FeatureId.make("AUTH")))),
+        // Verify story was created
+        const stories = yield* Effect.provide(
+          StoryRepo.pipe(Effect.flatMap((r) => r.list(PrdId.make("AUTH")))),
           repo.layer,
         );
-        expect(items.length).toBe(1);
-        expect(items[0]?.id).toBe("AUTH-0001");
+        expect(stories.length).toBe(1);
+        expect(stories[0]?.id).toBe("AUTH-0001");
       }),
     );
 
@@ -103,24 +103,24 @@ describe("CLI Commands", () => {
         const errorLines = yield* MockConsole.getErrorLines({
           stripAnsi: true,
         });
-        expect(errorLines.join("\n")).toContain("Invalid PRD input");
-        expect(errorLines.join("\n")).toContain("Expected PRD structure");
+        expect(errorLines.join("\n")).toContain("Invalid story input");
+        expect(errorLines.join("\n")).toContain("Expected Story structure");
       }),
     );
   });
 
   describe("list", () => {
     it.effect(
-      "lists PRD items sorted by priority",
+      "lists stories sorted by priority",
       Effect.fn(function* () {
         const { repo, testLayer } = createTestContext();
 
-        // Create items directly in repo
+        // Create stories directly in repo
         yield* Effect.provide(
           Effect.gen(function* () {
-            const r = yield* PrdRepo;
-            yield* r.create(FeatureId.make("AUTH"), {
-              id: PrdId.make("AUTH-0002"),
+            const r = yield* StoryRepo;
+            yield* r.create(PrdId.make("AUTH"), {
+              id: StoryId.make("AUTH-0002"),
               priority: 2,
               name: "Second",
               description: "Desc",
@@ -128,8 +128,8 @@ describe("CLI Commands", () => {
               acceptanceCriteria: [],
               status: "todo",
             });
-            yield* r.create(FeatureId.make("AUTH"), {
-              id: PrdId.make("AUTH-0001"),
+            yield* r.create(PrdId.make("AUTH"), {
+              id: StoryId.make("AUTH-0001"),
               priority: 1,
               name: "First",
               description: "Desc",
@@ -154,35 +154,35 @@ describe("CLI Commands", () => {
     );
 
     it.effect(
-      "shows empty message for no items",
+      "shows empty message for no stories",
       Effect.fn(function* () {
         const { testLayer } = createTestContext();
 
         yield* runCli(["list", "AUTH"], testLayer);
 
         const lines = yield* MockConsole.getLines({ stripAnsi: true });
-        expect(lines.join("\n")).toContain("No PRD items found");
+        expect(lines.join("\n")).toContain("No stories found");
       }),
     );
 
     it.effect(
-      "shows lock indicator for locked items",
+      "shows lock indicator for locked stories",
       Effect.fn(function* () {
         const { repo, testLayer } = createTestContext();
 
         yield* Effect.provide(
           Effect.gen(function* () {
-            const r = yield* PrdRepo;
-            yield* r.create(FeatureId.make("AUTH"), {
-              id: PrdId.make("AUTH-0001"),
+            const r = yield* StoryRepo;
+            yield* r.create(PrdId.make("AUTH"), {
+              id: StoryId.make("AUTH-0001"),
               priority: 1,
-              name: "Locked Item",
+              name: "Locked Story",
               description: "Desc",
               steps: [],
               acceptanceCriteria: [],
               status: "todo",
             });
-            yield* r.lock(FeatureId.make("AUTH"), PrdId.make("AUTH-0001"));
+            yield* r.lock(PrdId.make("AUTH"), StoryId.make("AUTH-0001"));
           }),
           repo.layer,
         );
@@ -195,26 +195,26 @@ describe("CLI Commands", () => {
     );
 
     it.effect(
-      "lists all features when no feature-id provided",
+      "lists all PRDs when no prd-id provided",
       Effect.fn(function* () {
         const { repo, testLayer } = createTestContext();
 
         yield* Effect.provide(
           Effect.gen(function* () {
-            const r = yield* PrdRepo;
-            yield* r.create(FeatureId.make("AUTH"), {
-              id: PrdId.make("AUTH-0001"),
+            const r = yield* StoryRepo;
+            yield* r.create(PrdId.make("AUTH"), {
+              id: StoryId.make("AUTH-0001"),
               priority: 1,
-              name: "Auth Feature",
+              name: "Auth Story",
               description: "Desc",
               steps: [],
               acceptanceCriteria: [],
               status: "todo",
             });
-            yield* r.create(FeatureId.make("PAYMENTS"), {
-              id: PrdId.make("PAY-0001"),
+            yield* r.create(PrdId.make("PAYMENTS"), {
+              id: StoryId.make("PAY-0001"),
               priority: 1,
-              name: "Payments Feature",
+              name: "Payments Story",
               description: "Desc",
               steps: [],
               acceptanceCriteria: [],
@@ -228,45 +228,45 @@ describe("CLI Commands", () => {
 
         const lines = yield* MockConsole.getLines({ stripAnsi: true });
         const output = lines.join("\n");
-        expect(output).toContain("Features:");
+        expect(output).toContain("PRDs:");
         expect(output).toContain("AUTH");
         expect(output).toContain("PAYMENTS");
       }),
     );
 
     it.effect(
-      "shows empty message when no features exist",
+      "shows empty message when no PRDs exist",
       Effect.fn(function* () {
         const { testLayer } = createTestContext();
 
         yield* runCli(["list"], testLayer);
 
         const lines = yield* MockConsole.getLines({ stripAnsi: true });
-        expect(lines.join("\n")).toContain("No features found");
+        expect(lines.join("\n")).toContain("No PRDs found");
       }),
     );
 
     it.effect(
-      "lists features in sorted order",
+      "lists PRDs in sorted order",
       Effect.fn(function* () {
         const { repo, testLayer } = createTestContext();
 
         yield* Effect.provide(
           Effect.gen(function* () {
-            const r = yield* PrdRepo;
-            yield* r.create(FeatureId.make("ZEBRA"), {
-              id: PrdId.make("ZEB-0001"),
+            const r = yield* StoryRepo;
+            yield* r.create(PrdId.make("ZEBRA"), {
+              id: StoryId.make("ZEB-0001"),
               priority: 1,
-              name: "Zebra Feature",
+              name: "Zebra Story",
               description: "Desc",
               steps: [],
               acceptanceCriteria: [],
               status: "todo",
             });
-            yield* r.create(FeatureId.make("ALPHA"), {
-              id: PrdId.make("ALP-0001"),
+            yield* r.create(PrdId.make("ALPHA"), {
+              id: StoryId.make("ALP-0001"),
               priority: 1,
-              name: "Alpha Feature",
+              name: "Alpha Story",
               description: "Desc",
               steps: [],
               acceptanceCriteria: [],
@@ -289,22 +289,22 @@ describe("CLI Commands", () => {
 
   describe("details", () => {
     it.effect(
-      "shows PRD item details",
+      "shows story details",
       Effect.fn(function* () {
         const { repo, testLayer } = createTestContext();
 
         yield* Effect.provide(
           Effect.gen(function* () {
-            const r = yield* PrdRepo;
-            yield* r.create(FeatureId.make("AUTH"), {
-              id: PrdId.make("AUTH-0001"),
+            const r = yield* StoryRepo;
+            yield* r.create(PrdId.make("AUTH"), {
+              id: StoryId.make("AUTH-0001"),
               priority: 1,
               name: "User Login",
               description: "Implement login flow",
               steps: ["Create form", "Add validation"],
               acceptanceCriteria: ["User can login"],
               status: "todo",
-              note: "Important feature",
+              note: "Important story",
             });
           }),
           repo.layer,
@@ -323,12 +323,12 @@ describe("CLI Commands", () => {
         expect(output).toContain("2. Add validation");
         expect(output).toContain("Acceptance Criteria:");
         expect(output).toContain("1. User can login");
-        expect(output).toContain("Note: Important feature");
+        expect(output).toContain("Note: Important story");
       }),
     );
 
     it.effect(
-      "shows error for non-existent PRD",
+      "shows error for non-existent story",
       Effect.fn(function* () {
         const { testLayer } = createTestContext();
 
@@ -344,15 +344,15 @@ describe("CLI Commands", () => {
 
   describe("update", () => {
     it.effect(
-      "updates PRD fields",
+      "updates story fields",
       Effect.fn(function* () {
         const { repo, testLayer } = createTestContext();
 
         yield* Effect.provide(
           Effect.gen(function* () {
-            const r = yield* PrdRepo;
-            yield* r.create(FeatureId.make("AUTH"), {
-              id: PrdId.make("AUTH-0001"),
+            const r = yield* StoryRepo;
+            yield* r.create(PrdId.make("AUTH"), {
+              id: StoryId.make("AUTH-0001"),
               priority: 1,
               name: "Original",
               description: "Desc",
@@ -370,21 +370,21 @@ describe("CLI Commands", () => {
         );
 
         const lines = yield* MockConsole.getLines({ stripAnsi: true });
-        expect(lines.join("\n")).toContain("Updated PRD item: AUTH-0001");
+        expect(lines.join("\n")).toContain("Updated story: AUTH-0001");
         expect(lines.join("\n")).toContain("Name: Updated");
       }),
     );
 
     it.effect(
-      "fails when PRD is locked",
+      "fails when story is locked",
       Effect.fn(function* () {
         const { repo, testLayer } = createTestContext();
 
         yield* Effect.provide(
           Effect.gen(function* () {
-            const r = yield* PrdRepo;
-            yield* r.create(FeatureId.make("AUTH"), {
-              id: PrdId.make("AUTH-0001"),
+            const r = yield* StoryRepo;
+            yield* r.create(PrdId.make("AUTH"), {
+              id: StoryId.make("AUTH-0001"),
               priority: 1,
               name: "Locked",
               description: "Desc",
@@ -392,7 +392,7 @@ describe("CLI Commands", () => {
               acceptanceCriteria: [],
               status: "todo",
             });
-            yield* r.lock(FeatureId.make("AUTH"), PrdId.make("AUTH-0001"));
+            yield* r.lock(PrdId.make("AUTH"), StoryId.make("AUTH-0001"));
           }),
           repo.layer,
         );
@@ -418,9 +418,9 @@ describe("CLI Commands", () => {
 
         yield* Effect.provide(
           Effect.gen(function* () {
-            const r = yield* PrdRepo;
-            yield* r.create(FeatureId.make("AUTH"), {
-              id: PrdId.make("AUTH-0001"),
+            const r = yield* StoryRepo;
+            yield* r.create(PrdId.make("AUTH"), {
+              id: StoryId.make("AUTH-0001"),
               priority: 1,
               name: "Test",
               description: "Desc",
@@ -428,7 +428,7 @@ describe("CLI Commands", () => {
               acceptanceCriteria: [],
               status: "todo",
             });
-            yield* r.lock(FeatureId.make("AUTH"), PrdId.make("AUTH-0001"));
+            yield* r.lock(PrdId.make("AUTH"), StoryId.make("AUTH-0001"));
           }),
           repo.layer,
         );
@@ -447,15 +447,15 @@ describe("CLI Commands", () => {
 
   describe("delete", () => {
     it.effect(
-      "deletes a PRD item",
+      "deletes a story",
       Effect.fn(function* () {
         const { repo, testLayer } = createTestContext();
 
         yield* Effect.provide(
           Effect.gen(function* () {
-            const r = yield* PrdRepo;
-            yield* r.create(FeatureId.make("AUTH"), {
-              id: PrdId.make("AUTH-0001"),
+            const r = yield* StoryRepo;
+            yield* r.create(PrdId.make("AUTH"), {
+              id: StoryId.make("AUTH-0001"),
               priority: 1,
               name: "To Delete",
               description: "Desc",
@@ -470,27 +470,27 @@ describe("CLI Commands", () => {
         yield* runCli(["delete", "AUTH", "AUTH-0001"], testLayer);
 
         const lines = yield* MockConsole.getLines({ stripAnsi: true });
-        expect(lines.join("\n")).toContain("Deleted PRD item: AUTH-0001");
+        expect(lines.join("\n")).toContain("Deleted story: AUTH-0001");
 
         // Verify deletion
-        const items = yield* Effect.provide(
-          PrdRepo.pipe(Effect.flatMap((r) => r.list(FeatureId.make("AUTH")))),
+        const stories = yield* Effect.provide(
+          StoryRepo.pipe(Effect.flatMap((r) => r.list(PrdId.make("AUTH")))),
           repo.layer,
         );
-        expect(items.length).toBe(0);
+        expect(stories.length).toBe(0);
       }),
     );
 
     it.effect(
-      "fails when PRD is locked",
+      "fails when story is locked",
       Effect.fn(function* () {
         const { repo, testLayer } = createTestContext();
 
         yield* Effect.provide(
           Effect.gen(function* () {
-            const r = yield* PrdRepo;
-            yield* r.create(FeatureId.make("AUTH"), {
-              id: PrdId.make("AUTH-0001"),
+            const r = yield* StoryRepo;
+            yield* r.create(PrdId.make("AUTH"), {
+              id: StoryId.make("AUTH-0001"),
               priority: 1,
               name: "Locked",
               description: "Desc",
@@ -498,7 +498,7 @@ describe("CLI Commands", () => {
               acceptanceCriteria: [],
               status: "todo",
             });
-            yield* r.lock(FeatureId.make("AUTH"), PrdId.make("AUTH-0001"));
+            yield* r.lock(PrdId.make("AUTH"), StoryId.make("AUTH-0001"));
           }),
           repo.layer,
         );
@@ -512,28 +512,28 @@ describe("CLI Commands", () => {
       }),
     );
 
-    describe("feature deletion", () => {
+    describe("PRD deletion", () => {
       it.effect(
-        "deletes all PRDs with --yes when none locked",
+        "deletes all stories with --yes when none locked",
         Effect.fn(function* () {
           const { repo, testLayer } = createTestContext();
 
           yield* Effect.provide(
             Effect.gen(function* () {
-              const r = yield* PrdRepo;
-              yield* r.create(FeatureId.make("AUTH"), {
-                id: PrdId.make("AUTH-0001"),
+              const r = yield* StoryRepo;
+              yield* r.create(PrdId.make("AUTH"), {
+                id: StoryId.make("AUTH-0001"),
                 priority: 1,
-                name: "First Item",
+                name: "First Story",
                 description: "Desc",
                 steps: [],
                 acceptanceCriteria: [],
                 status: "todo",
               });
-              yield* r.create(FeatureId.make("AUTH"), {
-                id: PrdId.make("AUTH-0002"),
+              yield* r.create(PrdId.make("AUTH"), {
+                id: StoryId.make("AUTH-0002"),
                 priority: 2,
-                name: "Second Item",
+                name: "Second Story",
                 description: "Desc",
                 steps: [],
                 acceptanceCriteria: [],
@@ -547,47 +547,47 @@ describe("CLI Commands", () => {
 
           const lines = yield* MockConsole.getLines({ stripAnsi: true });
           const output = lines.join("\n");
-          expect(output).toContain("The following 2 PRD(s) will be deleted:");
-          expect(output).toContain("AUTH-0001: First Item");
-          expect(output).toContain("AUTH-0002: Second Item");
-          expect(output).toContain("Deleted 2 PRD(s) from feature 'AUTH'");
+          expect(output).toContain("The following 2 story(s) will be deleted:");
+          expect(output).toContain("AUTH-0001: First Story");
+          expect(output).toContain("AUTH-0002: Second Story");
+          expect(output).toContain("Deleted 2 story(s) from PRD 'AUTH'");
 
-          // Verify all items deleted
-          const items = yield* Effect.provide(
-            PrdRepo.pipe(Effect.flatMap((r) => r.list(FeatureId.make("AUTH")))),
+          // Verify all stories deleted
+          const stories = yield* Effect.provide(
+            StoryRepo.pipe(Effect.flatMap((r) => r.list(PrdId.make("AUTH")))),
             repo.layer,
           );
-          expect(items.length).toBe(0);
+          expect(stories.length).toBe(0);
         }),
       );
 
       it.effect(
-        "fails with --yes when PRDs are locked without password",
+        "fails with --yes when stories are locked without password",
         Effect.fn(function* () {
           const { repo, testLayer } = createTestContext("secret123");
 
           yield* Effect.provide(
             Effect.gen(function* () {
-              const r = yield* PrdRepo;
-              yield* r.create(FeatureId.make("AUTH"), {
-                id: PrdId.make("AUTH-0001"),
+              const r = yield* StoryRepo;
+              yield* r.create(PrdId.make("AUTH"), {
+                id: StoryId.make("AUTH-0001"),
                 priority: 1,
-                name: "Unlocked Item",
+                name: "Unlocked Story",
                 description: "Desc",
                 steps: [],
                 acceptanceCriteria: [],
                 status: "todo",
               });
-              yield* r.create(FeatureId.make("AUTH"), {
-                id: PrdId.make("AUTH-0002"),
+              yield* r.create(PrdId.make("AUTH"), {
+                id: StoryId.make("AUTH-0002"),
                 priority: 2,
-                name: "Locked Item",
+                name: "Locked Story",
                 description: "Desc",
                 steps: [],
                 acceptanceCriteria: [],
                 status: "todo",
               });
-              yield* r.lock(FeatureId.make("AUTH"), PrdId.make("AUTH-0002"));
+              yield* r.lock(PrdId.make("AUTH"), StoryId.make("AUTH-0002"));
             }),
             repo.layer,
           );
@@ -598,47 +598,47 @@ describe("CLI Commands", () => {
             stripAnsi: true,
           });
           const errorOutput = errorLines.join("\n");
-          expect(errorOutput).toContain("Cannot delete feature 'AUTH'");
-          expect(errorOutput).toContain("1 PRD(s) are locked");
+          expect(errorOutput).toContain("Cannot delete PRD 'AUTH'");
+          expect(errorOutput).toContain("1 story(s) are locked");
           expect(errorOutput).toContain("AUTH-0002");
           expect(errorOutput).toContain("Use --password to force");
 
-          // Verify items still exist
-          const items = yield* Effect.provide(
-            PrdRepo.pipe(Effect.flatMap((r) => r.list(FeatureId.make("AUTH")))),
+          // Verify stories still exist
+          const stories = yield* Effect.provide(
+            StoryRepo.pipe(Effect.flatMap((r) => r.list(PrdId.make("AUTH")))),
             repo.layer,
           );
-          expect(items.length).toBe(2);
+          expect(stories.length).toBe(2);
         }),
       );
 
       it.effect(
-        "succeeds with --password --yes when PRDs are locked",
+        "succeeds with --password --yes when stories are locked",
         Effect.fn(function* () {
           const { repo, testLayer } = createTestContext("secret123");
 
           yield* Effect.provide(
             Effect.gen(function* () {
-              const r = yield* PrdRepo;
-              yield* r.create(FeatureId.make("AUTH"), {
-                id: PrdId.make("AUTH-0001"),
+              const r = yield* StoryRepo;
+              yield* r.create(PrdId.make("AUTH"), {
+                id: StoryId.make("AUTH-0001"),
                 priority: 1,
-                name: "Unlocked Item",
+                name: "Unlocked Story",
                 description: "Desc",
                 steps: [],
                 acceptanceCriteria: [],
                 status: "todo",
               });
-              yield* r.create(FeatureId.make("AUTH"), {
-                id: PrdId.make("AUTH-0002"),
+              yield* r.create(PrdId.make("AUTH"), {
+                id: StoryId.make("AUTH-0002"),
                 priority: 2,
-                name: "Locked Item",
+                name: "Locked Story",
                 description: "Desc",
                 steps: [],
                 acceptanceCriteria: [],
                 status: "todo",
               });
-              yield* r.lock(FeatureId.make("AUTH"), PrdId.make("AUTH-0002"));
+              yield* r.lock(PrdId.make("AUTH"), StoryId.make("AUTH-0002"));
             }),
             repo.layer,
           );
@@ -650,21 +650,21 @@ describe("CLI Commands", () => {
 
           const lines = yield* MockConsole.getLines({ stripAnsi: true });
           const output = lines.join("\n");
-          expect(output).toContain("The following 2 PRD(s) will be deleted:");
-          expect(output).toContain("AUTH-0002: Locked Item [LOCKED]");
-          expect(output).toContain("Deleted 2 PRD(s) from feature 'AUTH'");
+          expect(output).toContain("The following 2 story(s) will be deleted:");
+          expect(output).toContain("AUTH-0002: Locked Story [LOCKED]");
+          expect(output).toContain("Deleted 2 story(s) from PRD 'AUTH'");
 
-          // Verify all items deleted
-          const items = yield* Effect.provide(
-            PrdRepo.pipe(Effect.flatMap((r) => r.list(FeatureId.make("AUTH")))),
+          // Verify all stories deleted
+          const stories = yield* Effect.provide(
+            StoryRepo.pipe(Effect.flatMap((r) => r.list(PrdId.make("AUTH")))),
             repo.layer,
           );
-          expect(items.length).toBe(0);
+          expect(stories.length).toBe(0);
         }),
       );
 
       it.effect(
-        "shows message for empty feature",
+        "shows message for empty PRD",
         Effect.fn(function* () {
           const { testLayer } = createTestContext();
 
@@ -672,21 +672,21 @@ describe("CLI Commands", () => {
 
           const lines = yield* MockConsole.getLines({ stripAnsi: true });
           expect(lines.join("\n")).toContain(
-            "No PRDs found for feature 'NONEXISTENT'",
+            "No stories found for PRD 'NONEXISTENT'",
           );
         }),
       );
 
       it.effect(
-        "single PRD deletion still works with prd-id argument",
+        "single story deletion still works with story-id argument",
         Effect.fn(function* () {
           const { repo, testLayer } = createTestContext();
 
           yield* Effect.provide(
             Effect.gen(function* () {
-              const r = yield* PrdRepo;
-              yield* r.create(FeatureId.make("AUTH"), {
-                id: PrdId.make("AUTH-0001"),
+              const r = yield* StoryRepo;
+              yield* r.create(PrdId.make("AUTH"), {
+                id: StoryId.make("AUTH-0001"),
                 priority: 1,
                 name: "Keep This",
                 description: "Desc",
@@ -694,8 +694,8 @@ describe("CLI Commands", () => {
                 acceptanceCriteria: [],
                 status: "todo",
               });
-              yield* r.create(FeatureId.make("AUTH"), {
-                id: PrdId.make("AUTH-0002"),
+              yield* r.create(PrdId.make("AUTH"), {
+                id: StoryId.make("AUTH-0002"),
                 priority: 2,
                 name: "Delete This",
                 description: "Desc",
@@ -710,36 +710,36 @@ describe("CLI Commands", () => {
           yield* runCli(["delete", "AUTH", "AUTH-0002"], testLayer);
 
           const lines = yield* MockConsole.getLines({ stripAnsi: true });
-          expect(lines.join("\n")).toContain("Deleted PRD item: AUTH-0002");
+          expect(lines.join("\n")).toContain("Deleted story: AUTH-0002");
 
-          // Verify only one item deleted
-          const items = yield* Effect.provide(
-            PrdRepo.pipe(Effect.flatMap((r) => r.list(FeatureId.make("AUTH")))),
+          // Verify only one story deleted
+          const stories = yield* Effect.provide(
+            StoryRepo.pipe(Effect.flatMap((r) => r.list(PrdId.make("AUTH")))),
             repo.layer,
           );
-          expect(items.length).toBe(1);
-          expect(items[0]?.id).toBe("AUTH-0001");
+          expect(stories.length).toBe(1);
+          expect(stories[0]?.id).toBe("AUTH-0001");
         }),
       );
 
       it.effect(
-        "fails with wrong password for locked PRDs",
+        "fails with wrong password for locked stories",
         Effect.fn(function* () {
           const { repo, testLayer } = createTestContext("secret123");
 
           yield* Effect.provide(
             Effect.gen(function* () {
-              const r = yield* PrdRepo;
-              yield* r.create(FeatureId.make("AUTH"), {
-                id: PrdId.make("AUTH-0001"),
+              const r = yield* StoryRepo;
+              yield* r.create(PrdId.make("AUTH"), {
+                id: StoryId.make("AUTH-0001"),
                 priority: 1,
-                name: "Locked Item",
+                name: "Locked Story",
                 description: "Desc",
                 steps: [],
                 acceptanceCriteria: [],
                 status: "todo",
               });
-              yield* r.lock(FeatureId.make("AUTH"), PrdId.make("AUTH-0001"));
+              yield* r.lock(PrdId.make("AUTH"), StoryId.make("AUTH-0001"));
             }),
             repo.layer,
           );
@@ -754,12 +754,12 @@ describe("CLI Commands", () => {
           });
           expect(errorLines.join("\n")).toContain("Invalid password");
 
-          // Verify items still exist
-          const items = yield* Effect.provide(
-            PrdRepo.pipe(Effect.flatMap((r) => r.list(FeatureId.make("AUTH")))),
+          // Verify stories still exist
+          const stories = yield* Effect.provide(
+            StoryRepo.pipe(Effect.flatMap((r) => r.list(PrdId.make("AUTH")))),
             repo.layer,
           );
-          expect(items.length).toBe(1);
+          expect(stories.length).toBe(1);
         }),
       );
 
@@ -770,26 +770,26 @@ describe("CLI Commands", () => {
 
           yield* Effect.provide(
             Effect.gen(function* () {
-              const r = yield* PrdRepo;
-              yield* r.create(FeatureId.make("AUTH"), {
-                id: PrdId.make("AUTH-0001"),
+              const r = yield* StoryRepo;
+              yield* r.create(PrdId.make("AUTH"), {
+                id: StoryId.make("AUTH-0001"),
                 priority: 1,
-                name: "Unlocked Item",
+                name: "Unlocked Story",
                 description: "Desc",
                 steps: [],
                 acceptanceCriteria: [],
                 status: "todo",
               });
-              yield* r.create(FeatureId.make("AUTH"), {
-                id: PrdId.make("AUTH-0002"),
+              yield* r.create(PrdId.make("AUTH"), {
+                id: StoryId.make("AUTH-0002"),
                 priority: 2,
-                name: "Locked Item",
+                name: "Locked Story",
                 description: "Desc",
                 steps: [],
                 acceptanceCriteria: [],
                 status: "todo",
               });
-              yield* r.lock(FeatureId.make("AUTH"), PrdId.make("AUTH-0002"));
+              yield* r.lock(PrdId.make("AUTH"), StoryId.make("AUTH-0002"));
             }),
             repo.layer,
           );
@@ -801,9 +801,9 @@ describe("CLI Commands", () => {
 
           const lines = yield* MockConsole.getLines({ stripAnsi: true });
           const output = lines.join("\n");
-          expect(output).toContain("AUTH-0001: Unlocked Item");
-          expect(output).not.toContain("AUTH-0001: Unlocked Item [LOCKED]");
-          expect(output).toContain("AUTH-0002: Locked Item [LOCKED]");
+          expect(output).toContain("AUTH-0001: Unlocked Story");
+          expect(output).not.toContain("AUTH-0001: Unlocked Story [LOCKED]");
+          expect(output).toContain("AUTH-0002: Locked Story [LOCKED]");
         }),
       );
     });
@@ -811,15 +811,15 @@ describe("CLI Commands", () => {
 
   describe("lock", () => {
     it.effect(
-      "locks a PRD item with correct password",
+      "locks a story with correct password",
       Effect.fn(function* () {
         const { repo, testLayer } = createTestContext("secret123");
 
         yield* Effect.provide(
           Effect.gen(function* () {
-            const r = yield* PrdRepo;
-            yield* r.create(FeatureId.make("AUTH"), {
-              id: PrdId.make("AUTH-0001"),
+            const r = yield* StoryRepo;
+            yield* r.create(PrdId.make("AUTH"), {
+              id: StoryId.make("AUTH-0001"),
               priority: 1,
               name: "To Lock",
               description: "Desc",
@@ -837,18 +837,18 @@ describe("CLI Commands", () => {
         );
 
         const lines = yield* MockConsole.getLines({ stripAnsi: true });
-        expect(lines.join("\n")).toContain("Locked PRD item: AUTH-0001");
+        expect(lines.join("\n")).toContain("Locked story: AUTH-0001");
 
         // Verify lock
-        const item = yield* Effect.provide(
-          PrdRepo.pipe(
+        const story = yield* Effect.provide(
+          StoryRepo.pipe(
             Effect.flatMap((r) =>
-              r.get(FeatureId.make("AUTH"), PrdId.make("AUTH-0001")),
+              r.get(PrdId.make("AUTH"), StoryId.make("AUTH-0001")),
             ),
           ),
           repo.layer,
         );
-        expect(item.locked).toBe(true);
+        expect(story.locked).toBe(true);
       }),
     );
 
@@ -859,9 +859,9 @@ describe("CLI Commands", () => {
 
         yield* Effect.provide(
           Effect.gen(function* () {
-            const r = yield* PrdRepo;
-            yield* r.create(FeatureId.make("AUTH"), {
-              id: PrdId.make("AUTH-0001"),
+            const r = yield* StoryRepo;
+            yield* r.create(PrdId.make("AUTH"), {
+              id: StoryId.make("AUTH-0001"),
               priority: 1,
               name: "Test",
               description: "Desc",
@@ -892,9 +892,9 @@ describe("CLI Commands", () => {
 
         yield* Effect.provide(
           Effect.gen(function* () {
-            const r = yield* PrdRepo;
-            yield* r.create(FeatureId.make("AUTH"), {
-              id: PrdId.make("AUTH-0001"),
+            const r = yield* StoryRepo;
+            yield* r.create(PrdId.make("AUTH"), {
+              id: StoryId.make("AUTH-0001"),
               priority: 1,
               name: "Test",
               description: "Desc",
@@ -921,15 +921,15 @@ describe("CLI Commands", () => {
 
   describe("unlock", () => {
     it.effect(
-      "unlocks a PRD item with correct password",
+      "unlocks a story with correct password",
       Effect.fn(function* () {
         const { repo, testLayer } = createTestContext("secret123");
 
         yield* Effect.provide(
           Effect.gen(function* () {
-            const r = yield* PrdRepo;
-            yield* r.create(FeatureId.make("AUTH"), {
-              id: PrdId.make("AUTH-0001"),
+            const r = yield* StoryRepo;
+            yield* r.create(PrdId.make("AUTH"), {
+              id: StoryId.make("AUTH-0001"),
               priority: 1,
               name: "To Unlock",
               description: "Desc",
@@ -937,7 +937,7 @@ describe("CLI Commands", () => {
               acceptanceCriteria: [],
               status: "todo",
             });
-            yield* r.lock(FeatureId.make("AUTH"), PrdId.make("AUTH-0001"));
+            yield* r.lock(PrdId.make("AUTH"), StoryId.make("AUTH-0001"));
           }),
           repo.layer,
         );
@@ -948,25 +948,25 @@ describe("CLI Commands", () => {
         );
 
         const lines = yield* MockConsole.getLines({ stripAnsi: true });
-        expect(lines.join("\n")).toContain("Unlocked PRD item: AUTH-0001");
+        expect(lines.join("\n")).toContain("Unlocked story: AUTH-0001");
 
         // Verify unlock
-        const item = yield* Effect.provide(
-          PrdRepo.pipe(
+        const story = yield* Effect.provide(
+          StoryRepo.pipe(
             Effect.flatMap((r) =>
-              r.get(FeatureId.make("AUTH"), PrdId.make("AUTH-0001")),
+              r.get(PrdId.make("AUTH"), StoryId.make("AUTH-0001")),
             ),
           ),
           repo.layer,
         );
-        expect(item.locked).toBe(false);
+        expect(story.locked).toBe(false);
       }),
     );
   });
 
   describe("import", () => {
     it.effect(
-      "imports PRD items from a JSON file",
+      "imports stories from a JSON file",
       Effect.fn(function* () {
         const { repo, testLayer, mockFs } = createTestContext();
 
@@ -998,18 +998,18 @@ describe("CLI Commands", () => {
 
         const lines = yield* MockConsole.getLines({ stripAnsi: true });
         const output = lines.join("\n");
-        expect(output).toContain("Imported PRDs for feature: AUTH");
+        expect(output).toContain("Imported stories for PRD: AUTH");
         expect(output).toContain("Created: 2");
         expect(output).toContain("Skipped (duplicate IDs): 0");
 
-        // Verify items were created
-        const items = yield* Effect.provide(
-          PrdRepo.pipe(Effect.flatMap((r) => r.list(FeatureId.make("AUTH")))),
+        // Verify stories were created
+        const stories = yield* Effect.provide(
+          StoryRepo.pipe(Effect.flatMap((r) => r.list(PrdId.make("AUTH")))),
           repo.layer,
         );
-        expect(items.length).toBe(2);
-        expect(items[0]?.id).toBe("AUTH-0001");
-        expect(items[1]?.id).toBe("AUTH-0002");
+        expect(stories.length).toBe(2);
+        expect(stories[0]?.id).toBe("AUTH-0001");
+        expect(stories[1]?.id).toBe("AUTH-0002");
       }),
     );
 
@@ -1018,12 +1018,12 @@ describe("CLI Commands", () => {
       Effect.fn(function* () {
         const { repo, testLayer, mockFs } = createTestContext();
 
-        // Create existing item
+        // Create existing story
         yield* Effect.provide(
           Effect.gen(function* () {
-            const r = yield* PrdRepo;
-            yield* r.create(FeatureId.make("AUTH"), {
-              id: PrdId.make("AUTH-0001"),
+            const r = yield* StoryRepo;
+            yield* r.create(PrdId.make("AUTH"), {
+              id: StoryId.make("AUTH-0001"),
               priority: 1,
               name: "Existing",
               description: "Desc",
@@ -1049,7 +1049,7 @@ describe("CLI Commands", () => {
             {
               id: "AUTH-0002",
               priority: 2,
-              name: "New Item",
+              name: "New Story",
               description: "Should be created",
               steps: [],
               status: "todo",
@@ -1066,16 +1066,16 @@ describe("CLI Commands", () => {
         expect(output).toContain("Created: 1");
         expect(output).toContain("Skipped (duplicate IDs): 1");
 
-        // Verify original item unchanged
-        const item = yield* Effect.provide(
-          PrdRepo.pipe(
+        // Verify original story unchanged
+        const story = yield* Effect.provide(
+          StoryRepo.pipe(
             Effect.flatMap((r) =>
-              r.get(FeatureId.make("AUTH"), PrdId.make("AUTH-0001")),
+              r.get(PrdId.make("AUTH"), StoryId.make("AUTH-0001")),
             ),
           ),
           repo.layer,
         );
-        expect(item.name).toBe("Existing");
+        expect(story.name).toBe("Existing");
       }),
     );
 
@@ -1091,7 +1091,7 @@ describe("CLI Commands", () => {
         const errorLines = yield* MockConsole.getErrorLines({
           stripAnsi: true,
         });
-        expect(errorLines.join("\n")).toContain("Invalid PRD input");
+        expect(errorLines.join("\n")).toContain("Invalid story input");
         expect(errorLines.join("\n")).toContain("Expected import file structure");
       }),
     );

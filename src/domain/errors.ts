@@ -1,37 +1,37 @@
 import { Schema } from "effect"
 
-export class PrdNotFoundError extends Schema.TaggedError<PrdNotFoundError>()(
-  "PrdNotFoundError",
+export class StoryNotFoundError extends Schema.TaggedError<StoryNotFoundError>()(
+  "StoryNotFoundError",
   {
-    featureId: Schema.String,
+    prdId: Schema.String,
     id: Schema.String,
   }
 ) {
   override get message() {
-    return `PRD item '${this.id}' not found in feature '${this.featureId}'`
+    return `Story '${this.id}' not found in PRD '${this.prdId}'`
   }
 }
 
-export class PrdLockedError extends Schema.TaggedError<PrdLockedError>()(
-  "PrdLockedError",
+export class StoryLockedError extends Schema.TaggedError<StoryLockedError>()(
+  "StoryLockedError",
   {
     id: Schema.String,
   }
 ) {
   override get message() {
-    return `PRD item '${this.id}' is locked. Use 'unlock' command first.`
+    return `Story '${this.id}' is locked. Use 'unlock' command first.`
   }
 }
 
 export class DuplicateIdError extends Schema.TaggedError<DuplicateIdError>()(
   "DuplicateIdError",
   {
-    featureId: Schema.String,
+    prdId: Schema.String,
     id: Schema.String,
   }
 ) {
   override get message() {
-    return `PRD item with ID '${this.id}' already exists in feature '${this.featureId}'`
+    return `Story with ID '${this.id}' already exists in PRD '${this.prdId}'`
   }
 }
 
@@ -53,25 +53,25 @@ export class PasswordNotConfiguredError extends Schema.TaggedError<PasswordNotCo
   }
 }
 
-export class InvalidPrdInputError extends Schema.TaggedError<InvalidPrdInputError>()(
-  "InvalidPrdInputError",
+export class InvalidStoryInputError extends Schema.TaggedError<InvalidStoryInputError>()(
+  "InvalidStoryInputError",
   {
     reason: Schema.String,
   }
 ) {
   override get message() {
-    return `Invalid PRD input: ${this.reason}`
+    return `Invalid story input: ${this.reason}`
   }
 }
 
-export class FeatureHasLockedPrdsError extends Schema.TaggedError<FeatureHasLockedPrdsError>()(
-  "FeatureHasLockedPrdsError",
+export class PrdHasLockedStoriesError extends Schema.TaggedError<PrdHasLockedStoriesError>()(
+  "PrdHasLockedStoriesError",
   {
-    featureId: Schema.String,
+    prdId: Schema.String,
     lockedIds: Schema.Array(Schema.String),
   }
 ) {
   override get message() {
-    return `Cannot delete feature '${this.featureId}': ${this.lockedIds.length} PRD(s) are locked: [${this.lockedIds.join(", ")}]. Use --password to force.`
+    return `Cannot delete PRD '${this.prdId}': ${this.lockedIds.length} story(s) are locked: [${this.lockedIds.join(", ")}]. Use --password to force.`
   }
 }

@@ -1,16 +1,16 @@
 import { Schema } from "effect"
 
+export const StoryId = Schema.String.pipe(Schema.brand("StoryId"))
+export type StoryId = typeof StoryId.Type
+
 export const PrdId = Schema.String.pipe(Schema.brand("PrdId"))
 export type PrdId = typeof PrdId.Type
-
-export const FeatureId = Schema.String.pipe(Schema.brand("FeatureId"))
-export type FeatureId = typeof FeatureId.Type
 
 export const Status = Schema.Literal("todo", "done", "sent-back")
 export type Status = typeof Status.Type
 
-export class PrdItem extends Schema.Class<PrdItem>("PrdItem")({
-  id: PrdId,
+export class StoryItem extends Schema.Class<StoryItem>("StoryItem")({
+  id: StoryId,
   priority: Schema.Number,
   name: Schema.NonEmptyString,
   description: Schema.String,
@@ -26,8 +26,8 @@ export class PrdItem extends Schema.Class<PrdItem>("PrdItem")({
   locked: Schema.optionalWith(Schema.Boolean, { default: () => false }),
 }) {}
 
-export class PrdItemInput extends Schema.Class<PrdItemInput>("PrdItemInput")({
-  id: PrdId,
+export class StoryItemInput extends Schema.Class<StoryItemInput>("StoryItemInput")({
+  id: StoryId,
   priority: Schema.Number,
   name: Schema.NonEmptyString,
   description: Schema.String,
@@ -39,12 +39,12 @@ export class PrdItemInput extends Schema.Class<PrdItemInput>("PrdItemInput")({
   note: Schema.optional(Schema.String),
 }) {}
 
-export const PrdItemInputJson = Schema.parseJson(PrdItemInput)
+export const StoryItemInputJson = Schema.parseJson(StoryItemInput)
 
-export class PrdItemPartialInput extends Schema.Class<PrdItemPartialInput>(
-  "PrdItemPartialInput"
+export class StoryItemPartialInput extends Schema.Class<StoryItemPartialInput>(
+  "StoryItemPartialInput"
 )({
-  id: Schema.optional(PrdId),
+  id: Schema.optional(StoryId),
   priority: Schema.optional(Schema.Number),
   name: Schema.optional(Schema.NonEmptyString),
   description: Schema.optional(Schema.String),
@@ -54,22 +54,22 @@ export class PrdItemPartialInput extends Schema.Class<PrdItemPartialInput>(
   note: Schema.optional(Schema.String),
 }) {}
 
-export const PrdItemPartialInputJson = Schema.parseJson(PrdItemPartialInput)
+export const StoryItemPartialInputJson = Schema.parseJson(StoryItemPartialInput)
 
-// Import file schema: { id: "feature-id", items: [...PrdItemInput] }
+// Import file schema: { id: "prd-id", items: [...StoryItemInput] }
 export class ImportFile extends Schema.Class<ImportFile>("ImportFile")({
-  id: FeatureId,
-  items: Schema.Array(PrdItemInput),
+  id: PrdId,
+  items: Schema.Array(StoryItemInput),
 }) {}
 
 export const ImportFileJson = Schema.parseJson(ImportFile)
 
-export const PRD_INPUT_HELP = `
-Expected PRD structure:
+export const STORY_INPUT_HELP = `
+Expected Story structure:
 {
   "id": "XXX-YYYY",              // required, e.g., "AUTH-0001"
   "priority": 1,                 // required, number
-  "name": "Feature name",        // required, string
+  "name": "Story name",          // required, string
   "description": "Details...",   // required, string
   "steps": ["Step 1", "Step 2"], // required, string[]
   "acceptanceCriteria": ["..."], // optional, string[]

@@ -1,73 +1,73 @@
 import { Effect, Layer } from "effect";
 import {
   DuplicateIdError,
-  FeatureHasLockedPrdsError,
+  PrdHasLockedStoriesError,
   InvalidPasswordError,
   PasswordNotConfiguredError,
-  PrdLockedError,
-  PrdNotFoundError,
+  StoryLockedError,
+  StoryNotFoundError,
 } from "../src/domain/errors.js";
 import {
-  FeatureId,
-  ImportFile,
   PrdId,
-  PrdItem,
-  PrdItemInput,
-  PrdItemPartialInput,
+  ImportFile,
+  StoryId,
+  StoryItem,
+  StoryItemInput,
+  StoryItemPartialInput,
   Status,
-} from "../src/domain/PrdItem.js";
+} from "../src/domain/Story.js";
 import { PasswordService } from "../src/services/PasswordService.js";
-import { PrdRepo } from "../src/services/PrdRepo.js";
+import { StoryRepo } from "../src/services/StoryRepo.js";
 
-type DataStore = Map<FeatureId, Map<PrdId, PrdItem>>;
+type DataStore = Map<PrdId, Map<StoryId, StoryItem>>;
 
-export class TestPrdRepo {
+export class TestStoryRepo {
   private store: DataStore = new Map();
 
-  private getFeatureMap(featureId: FeatureId): Map<PrdId, PrdItem> {
-    let featureMap = this.store.get(featureId);
-    if (!featureMap) {
-      featureMap = new Map();
-      this.store.set(featureId, featureMap);
+  private getPrdMap(prdId: PrdId): Map<StoryId, StoryItem> {
+    let prdMap = this.store.get(prdId);
+    if (!prdMap) {
+      prdMap = new Map();
+      this.store.set(prdId, prdMap);
     }
-    return featureMap;
+    return prdMap;
   }
 
-  readonly layer = Layer.succeed(PrdRepo, {
-    create: (featureId: FeatureId, input: PrdItemInput) =>
+  readonly layer = Layer.succeed(StoryRepo, {
+    create: (prdId: PrdId, input: StoryItemInput) =>
       Effect.gen(this, function* () {
-        const featureMap = this.getFeatureMap(featureId);
+        const prdMap = this.getPrdMap(prdId);
 
-        if (featureMap.has(input.id)) {
-          return yield* new DuplicateIdError({ featureId, id: input.id });
+        if (prdMap.has(input.id)) {
+          return yield* new DuplicateIdError({ prdId, id: input.id });
         }
 
         const now = new Date();
-        const item = PrdItem.make({
+        const story = StoryItem.make({
           ...input,
           createdAt: now,
           updatedAt: now,
           locked: false,
         });
 
-        featureMap.set(input.id, item);
-        return item;
+        prdMap.set(input.id, story);
+        return story;
       }),
 
-    update: (featureId: FeatureId, id: PrdId, partial: PrdItemPartialInput) =>
+    update: (prdId: PrdId, id: StoryId, partial: StoryItemPartialInput) =>
       Effect.gen(this, function* () {
-        const featureMap = this.getFeatureMap(featureId);
-        const existing = featureMap.get(id);
+        const prdMap = this.getPrdMap(prdId);
+        const existing = prdMap.get(id);
 
         if (!existing) {
-          return yield* new PrdNotFoundError({ featureId, id });
+          return yield* new StoryNotFoundError({ prdId, id });
         }
 
         if (existing.locked) {
-          return yield* new PrdLockedError({ id });
+          return yield* new StoryLockedError({ id });
         }
 
-        const updated = PrdItem.make({
+        const updated = StoryItem.make({
           ...existing,
           ...(partial.priority !== undefined && { priority: partial.priority }),
           ...(partial.name !== undefined && { name: partial.name }),
@@ -83,100 +83,100 @@ export class TestPrdRepo {
           updatedAt: new Date(),
         });
 
-        featureMap.set(id, updated);
+        prdMap.set(id, updated);
         return updated;
       }),
 
-    updateStatus: (featureId: FeatureId, id: PrdId, status: Status) =>
+    updateStatus: (prdId: PrdId, id: StoryId, status: Status) =>
       Effect.gen(this, function* () {
-        const featureMap = this.getFeatureMap(featureId);
-        const existing = featureMap.get(id);
+        const prdMap = this.getPrdMap(prdId);
+        const existing = prdMap.get(id);
 
         if (!existing) {
-          return yield* new PrdNotFoundError({ featureId, id });
+          return yield* new StoryNotFoundError({ prdId, id });
         }
 
-        const updated = PrdItem.make({
+        const updated = StoryItem.make({
           ...existing,
           status,
           updatedAt: new Date(),
         });
 
-        featureMap.set(id, updated);
+        prdMap.set(id, updated);
         return updated;
       }),
 
-    delete: (featureId: FeatureId, id: PrdId) =>
+    delete: (prdId: PrdId, id: StoryId) =>
       Effect.gen(this, function* () {
-        const featureMap = this.getFeatureMap(featureId);
-        const existing = featureMap.get(id);
+        const prdMap = this.getPrdMap(prdId);
+        const existing = prdMap.get(id);
 
         if (!existing) {
-          return yield* new PrdNotFoundError({ featureId, id });
+          return yield* new StoryNotFoundError({ prdId, id });
         }
 
         if (existing.locked) {
-          return yield* new PrdLockedError({ id });
+          return yield* new StoryLockedError({ id });
         }
 
-        featureMap.delete(id);
+        prdMap.delete(id);
       }),
 
-    list: (featureId: FeatureId) =>
+    list: (prdId: PrdId) =>
       Effect.sync(() => {
-        const featureMap = this.getFeatureMap(featureId);
-        return [...featureMap.values()].sort((a, b) => a.priority - b.priority);
+        const prdMap = this.getPrdMap(prdId);
+        return [...prdMap.values()].sort((a, b) => a.priority - b.priority);
       }),
 
-    get: (featureId: FeatureId, id: PrdId) =>
+    get: (prdId: PrdId, id: StoryId) =>
       Effect.gen(this, function* () {
-        const featureMap = this.getFeatureMap(featureId);
-        const item = featureMap.get(id);
+        const prdMap = this.getPrdMap(prdId);
+        const story = prdMap.get(id);
 
-        if (!item) {
-          return yield* new PrdNotFoundError({ featureId, id });
+        if (!story) {
+          return yield* new StoryNotFoundError({ prdId, id });
         }
 
-        return item;
+        return story;
       }),
 
-    lock: (featureId: FeatureId, id: PrdId) =>
+    lock: (prdId: PrdId, id: StoryId) =>
       Effect.gen(this, function* () {
-        const featureMap = this.getFeatureMap(featureId);
-        const existing = featureMap.get(id);
+        const prdMap = this.getPrdMap(prdId);
+        const existing = prdMap.get(id);
 
         if (!existing) {
-          return yield* new PrdNotFoundError({ featureId, id });
+          return yield* new StoryNotFoundError({ prdId, id });
         }
 
-        const updated = PrdItem.make({
+        const updated = StoryItem.make({
           ...existing,
           locked: true,
           updatedAt: new Date(),
         });
 
-        featureMap.set(id, updated);
+        prdMap.set(id, updated);
       }),
 
-    unlock: (featureId: FeatureId, id: PrdId) =>
+    unlock: (prdId: PrdId, id: StoryId) =>
       Effect.gen(this, function* () {
-        const featureMap = this.getFeatureMap(featureId);
-        const existing = featureMap.get(id);
+        const prdMap = this.getPrdMap(prdId);
+        const existing = prdMap.get(id);
 
         if (!existing) {
-          return yield* new PrdNotFoundError({ featureId, id });
+          return yield* new StoryNotFoundError({ prdId, id });
         }
 
-        const updated = PrdItem.make({
+        const updated = StoryItem.make({
           ...existing,
           locked: false,
           updatedAt: new Date(),
         });
 
-        featureMap.set(id, updated);
+        prdMap.set(id, updated);
       }),
 
-    listFeatures: () =>
+    listPrds: () =>
       Effect.sync(() => {
         return [...this.store.keys()]
           .filter((key) => (this.store.get(key)?.size ?? 0) > 0)
@@ -185,60 +185,60 @@ export class TestPrdRepo {
 
     importFile: (data: ImportFile) =>
       Effect.gen(this, function* () {
-        const featureMap = this.getFeatureMap(data.id);
+        const prdMap = this.getPrdMap(data.id);
         let created = 0;
         let skipped = 0;
 
         for (const input of data.items) {
-          if (featureMap.has(input.id)) {
+          if (prdMap.has(input.id)) {
             skipped++;
             continue;
           }
 
           const now = new Date();
-          const item = PrdItem.make({
+          const story = StoryItem.make({
             ...input,
             createdAt: now,
             updatedAt: now,
             locked: false,
           });
 
-          featureMap.set(input.id, item);
+          prdMap.set(input.id, story);
           created++;
         }
 
         return { created, skipped };
       }),
 
-    deleteFeature: (featureId: FeatureId) =>
+    deletePrd: (prdId: PrdId) =>
       Effect.gen(this, function* () {
-        const featureMap = this.store.get(featureId);
-        if (!featureMap || featureMap.size === 0) {
+        const prdMap = this.store.get(prdId);
+        if (!prdMap || prdMap.size === 0) {
           return { deleted: 0 };
         }
 
-        const lockedIds = [...featureMap.values()]
-          .filter((item) => item.locked)
-          .map((item) => item.id);
+        const lockedIds = [...prdMap.values()]
+          .filter((story) => story.locked)
+          .map((story) => story.id);
 
         if (lockedIds.length > 0) {
-          return yield* new FeatureHasLockedPrdsError({ featureId, lockedIds });
+          return yield* new PrdHasLockedStoriesError({ prdId, lockedIds });
         }
 
-        const deleted = featureMap.size;
-        this.store.delete(featureId);
+        const deleted = prdMap.size;
+        this.store.delete(prdId);
         return { deleted };
       }),
 
-    deleteFeatureForce: (featureId: FeatureId) =>
+    deletePrdForce: (prdId: PrdId) =>
       Effect.sync(() => {
-        const featureMap = this.store.get(featureId);
-        if (!featureMap || featureMap.size === 0) {
+        const prdMap = this.store.get(prdId);
+        if (!prdMap || prdMap.size === 0) {
           return { deleted: 0 };
         }
 
-        const deleted = featureMap.size;
-        this.store.delete(featureId);
+        const deleted = prdMap.size;
+        this.store.delete(prdId);
         return { deleted };
       }),
   });
@@ -269,7 +269,7 @@ export class TestPasswordService {
   }
 }
 
-export const createTestRepo = () => new TestPrdRepo();
+export const createTestRepo = () => new TestStoryRepo();
 export const createTestPasswordService = (
   password: string | null = "test-password",
 ) => new TestPasswordService(password);
